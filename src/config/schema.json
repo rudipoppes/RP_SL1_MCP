@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RP_SL1_MCP Configuration",
+  "description": "Configuration schema for Restorepoint MCP Server",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["restorepoint", "mcp"],
+  "properties": {
+    "restorepoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverUrl", "token"],
+      "properties": {
+        "serverUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the Restorepoint server"
+        },
+        "apiVersion": {
+          "type": "string",
+          "enum": ["v1", "v2"],
+          "default": "v2",
+          "description": "API version to use"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "description": "API authentication token"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 30000,
+          "description": "Request timeout in milliseconds"
+        },
+        "retryAttempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Number of retry attempts for failed requests"
+        },
+        "retryDelay": {
+          "type": "integer",
+          "minimum": 100,
+          "default": 1000,
+          "description": "Delay between retries in milliseconds"
+        }
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverName", "version"],
+      "properties": {
+        "serverName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Name of the MCP server"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Server version in semver format"
+        },
+        "logLevel": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug"],
+          "default": "info",
+          "description": "Logging level"
+        },
+        "maxConcurrentTasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum number of concurrent async tasks"
+        }
+      }
+    },
+    "async": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxConcurrentTasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum concurrent async operations"
+        },
+        "taskTimeout": {
+          "type": "integer",
+          "minimum": 60000,
+          "default": 3600000,
+          "description": "Task timeout in milliseconds"
+        },
+        "cleanupInterval": {
+          "type": "integer",
+          "minimum": 10000,
+          "default": 300000,
+          "description": "Cleanup interval for completed tasks in milliseconds"
+        }
+      }
+    }
+  }
+}

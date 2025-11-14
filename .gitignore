@@ -209,3 +209,37 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# TypeScript specific
+*.tsbuildinfo
+dist/
+build/
+
+# Jest
+.nyc_output
+/coverage
+*.lcov
+
+# Jest extension cache
+.vscode-jest/
+
+# MCP specific
+*.mcp-session
+mcp-logs/
+
+# Restorepoint sensitive data
+restorepoint-credentials.json
+restorepoint-backups/
+
+# Test files (output)
+test-results/
+
+# Cache directories for TypeScript
+.parcel-cache/
+
+# Editor specific
+.vscode/settings.json
+.vscode/launch.json
+
+# Cache directories for TypeScript
+.parcel-cache/
