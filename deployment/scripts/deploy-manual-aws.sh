@@ -364,7 +364,6 @@ main() {
     check_ssh_key
     deploy_to_manual_instance
     verify_deployment
-}
     
     echo ""
     print_header "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
