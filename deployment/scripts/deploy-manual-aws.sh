@@ -112,9 +112,14 @@ SETUP_EOF
     # Create temp directory and copy files
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "mkdir -p /tmp/deploy"
     
-    # Copy all files excluding node_modules and .git, but include package-lock.json
-    rsync -avz --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='logs' \
-        --include='package-lock.json' --include='package*.json' \
+    # Copy all source files excluding large directories
+    rsync -avz \
+        --exclude='.git/' \
+        --exclude='node_modules/' \
+        --exclude='dist/' \
+        --exclude='logs/' \
+        --exclude='.claude/' \
+        --exclude='*.log' \
         -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
         . ec2-user@"$EC2_IP":/tmp/deploy/
     
