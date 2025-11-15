@@ -217,6 +217,13 @@ CLONE_EOF
         # Create logs directory
         mkdir -p logs
         
+        # Check if config.json exists, create from example if not
+        if [ ! -f "config.json" ]; then
+            print_status "Creating config.json from example..."
+            cp config.json.example config.json
+            print_warning "Please edit config.json with your Restorepoint details"
+        fi
+        
         # Build Docker image
         print_status "Building Docker image..."
         docker build -t rp-sl1-mcp .
@@ -239,21 +246,33 @@ CLONE_EOF
             rp-sl1-mcp
         
         # Wait for startup
-        sleep 30
+        sleep 15
+        
+        # Check if container is running
+        print_status "Checking container status..."
+        if ! docker ps | grep rp-sl1-mcp; then
+            print_error "❌ Container is not running!"
+            print_error "Container logs:"
+            docker logs rp-sl1-mcp
+            exit 1
+        fi
         
         # Health check
         print_status "Performing health check..."
-        if curl -f http://localhost:3000/health; then
+        sleep 15  # Give more time for application to start
+        if curl -f http://localhost:3000/health 2>/dev/null; then
             print_status "✅ Health check passed!"
             print_status "✅ MCP Server is running successfully"
             
             # Show logs
             print_status "Recent logs:"
-            docker-compose logs --tail=20 mcp-server
+            docker logs --tail=10 rp-sl1-mcp
         else
             print_error "❌ Health check failed!"
-            print_error "Showing logs:"
-            docker-compose logs mcp-server
+            print_error "Container logs:"
+            docker logs rp-sl1-mcp
+            print_error "Container status:"
+            docker ps -a | grep rp-sl1-mcp
             exit 1
         fi
         
