@@ -62,8 +62,9 @@ check_prerequisites() {
     NODE_VERSION=$(node --version | cut -d'v' -f2)
     NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1)
     
-    if [ "$NODE_MAJOR" -lt 20 ]; then
-        print_error "Node.js 20+ required, found $NODE_VERSION"
+    if [ "$NODE_MAJOR" -lt 22 ]; then
+        print_error "Node.js 22+ required, found $NODE_VERSION"
+        print_error "Please upgrade Node.js: brew install node@22 or nvm install 22"
         exit 1
     fi
     

@@ -61,7 +61,7 @@ npm test
 
 ## 🛠️ **Technologies**
 
-- **Node.js 20+** with TypeScript
+- **Node.js 22+** with TypeScript
 - **Docker** containerization
 - **AWS EC2** deployment ready
 - **@modelcontextprotocol/sdk** for MCP

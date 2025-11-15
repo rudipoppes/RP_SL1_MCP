@@ -696,12 +696,13 @@ async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> 
   if (process.env.ENABLE_HTTP_SERVER === 'true' || process.env.NODE_ENV === 'production') {
     try {
       // Dynamic import for express to avoid dependency if not needed
+      // @ts-ignore - Express types not available
       const express = await import('express');
       const app = express.default();
-      const port = process.env.PORT || 3000;
+      const port = Number(process.env.PORT) || 3000;
 
       // Health check endpoint
-      app.get('/health', (req, res) => {
+      app.get('/health', (req: any, res: any) => {
         const isHealthy = mcpServer['apiClient'] !== undefined;
         const status = {
           status: isHealthy ? 'healthy' : 'unhealthy',
@@ -716,7 +717,7 @@ async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> 
       });
 
       // Basic info endpoint
-      app.get('/info', (req, res) => {
+      app.get('/info', (req: any, res: any) => {
         res.json({
           server: MCP_CONSTANTS.SERVER_NAME,
           version: MCP_CONSTANTS.SERVER_VERSION,
