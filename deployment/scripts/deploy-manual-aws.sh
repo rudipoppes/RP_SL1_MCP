@@ -62,10 +62,10 @@ check_ssh_key() {
 deploy_to_manual_instance() {
     print_header "DEPLOYING TO MANUAL EC2 INSTANCE"
     
-    print_status "Connecting to EC2 instance: $EC2_IP"
+    print_status "Setting up EC2 instance and copying files..."
     
-    # Setup EC2 instance and deploy
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'DEPLOY_EOF'
+    # Setup EC2 instance first
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'SETUP_EOF'
         set -e
         
         print_status() {
@@ -92,37 +92,53 @@ deploy_to_manual_instance() {
             print_status "Docker already installed"
         fi
         
-        # Install Git
-        print_status "Installing Git..."
-        if ! command -v git &> /dev/null; then
-            sudo yum install -y git
-        else
-            print_status "Git already installed"
-        fi
+        # Install Git and Node.js
+        print_status "Installing Git and Node.js..."
+        sudo yum install -y git
+        curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+        sudo yum install -y nodejs
         
         # Create application directory
         print_status "Creating application directory..."
         sudo mkdir -p /opt/restorepoint
         sudo chown ec2-user:ec2-user /opt/restorepoint
+        
+        print_status "✅ EC2 instance setup completed"
+SETUP_EOF
+    
+    # Copy files from local machine
+    print_status "Copying application files to EC2..."
+    
+    # Create temp directory and copy files
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "mkdir -p /tmp/deploy"
+    
+    # Copy all files excluding node_modules and .git
+    rsync -avz --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='logs' \
+        -e "ssh -o StrictHostKeyChecking=no -i $SSH_KEY" \
+        . ec2-user@"$EC2_IP":/tmp/deploy/
+    
+    # Deploy on EC2
+    print_status "Deploying application on EC2..."
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'DEPLOY_EOF'
+        set -e
+        
+        print_status() {
+            echo -e "\033[0;32m[INFO]\033[0m $1"
+        }
+        
+        print_error() {
+            echo -e "\033[0;31m[ERROR]\033[0m $1"
+        }
+        
         cd /opt/restorepoint
         
-        # Clone repository
-        print_status "Cloning repository..."
-        if [ -d "RP_SL1_MCP" ]; then
-            rm -rf RP_SL1_MCP
-        fi
-        git clone https://github.com/rudipoppes/RP_SL1_MCP.git RP_SL1_MCP
+        # Remove old deployment and move new files
+        rm -rf RP_SL1_MCP
+        mv /tmp/deploy RP_SL1_MCP
         cd RP_SL1_MCP
-        
-        # Checkout specific branch if needed
-        if [ "main" != "main" ]; then
-            git checkout main
-        fi
         
         # Install dependencies
         print_status "Installing Node.js dependencies..."
-        curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
-        sudo yum install -y nodejs
         npm ci
         
         # Build application
