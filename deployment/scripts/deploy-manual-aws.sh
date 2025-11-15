@@ -213,7 +213,7 @@ CLONE_EOF
         MCP_PID=$!
         
         # Save PID for service management
-        echo $MCP_PID > /var/run/mcp-server.pid
+        echo $MCP_PID > /opt/restorepoint/RP_SL1_MCP/mcp-server.pid
         
         print_status "✅ MCP Server started with PID: $MCP_PID"
         
@@ -244,19 +244,20 @@ Description=Restorepoint MCP Server
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 WorkingDirectory=/opt/restorepoint/RP_SL1_MCP
 User=ec2-user
 Group=ec2-user
 Environment=NODE_ENV=production
 Environment=ENABLE_HTTP_SERVER=true
-Environment=PATH=/opt/homebrew/opt/node@22/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/npm start
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/node dist/server.js
 Restart=always
 RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=restorepoint-mcp
+PIDFile=/opt/restorepoint/RP_SL1_MCP/mcp-server.pid
 
 [Install]
 WantedBy=multi-user.target
