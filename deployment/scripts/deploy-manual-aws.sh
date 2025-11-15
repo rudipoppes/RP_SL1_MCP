@@ -140,6 +140,11 @@ SETUP_EOF
     # Clone repository from GitHub
     print_status "Cloning repository from GitHub..."
     
+    # Export variables for SSH session
+    export REPO_URL
+    export GITHUB_TOKEN
+    export BRANCH
+    
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << CLONE_EOF
         set -e
         
@@ -156,13 +161,13 @@ SETUP_EOF
         print_status "Cloning from GitHub..."
         
         # Create URL with token and clone directly
-        REPO_WITH_TOKEN="\$(echo "$REPO_URL" | sed "s|https://github.com/|https://$GITHUB_TOKEN@github.com/|")"
+        REPO_WITH_TOKEN="\$(echo "\$REPO_URL" | sed "s|https://github.com/|https://\$GITHUB_TOKEN@github.com/|")"
         git clone "\$REPO_WITH_TOKEN" RP_SL1_MCP
         cd RP_SL1_MCP
         
         # Checkout specific branch if not main
-        if [ "$BRANCH" != "main" ]; then
-            git checkout "$BRANCH"
+        if [ "\$BRANCH" != "main" ]; then
+            git checkout "\$BRANCH"
         fi
         
         print_status "✅ Repository cloned successfully"
