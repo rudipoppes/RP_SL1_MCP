@@ -32,7 +32,7 @@ Create production-ready Docker deployment for your existing MCP server, enabling
 - ✅ Foundation for the chat interface architecture
 
 ### **Prerequisites**
-- Node.js 18+ installed locally
+- Node.js 20+ installed locally
 - Docker Desktop (or Docker Engine) installed
 - AWS account with EC2 access
 - Your Restorepoint API token
@@ -45,7 +45,7 @@ Create production-ready Docker deployment for your existing MCP server, enabling
 
 ```dockerfile
 # ---- Build Stage ----
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -63,7 +63,7 @@ COPY . .
 RUN npm run build
 
 # ---- Production Stage ----
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Install curl for health checks
 RUN apk add --no-cache curl

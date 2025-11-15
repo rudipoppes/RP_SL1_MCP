@@ -2,7 +2,7 @@
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Professional MCP (Model Context Protocol) server for Restorepoint API integration with complete Docker deployment infrastructure.**
@@ -61,7 +61,7 @@ npm test
 
 ## 🛠️ **Technologies**
 
-- **Node.js 18+** with TypeScript
+- **Node.js 20+** with TypeScript
 - **Docker** containerization
 - **AWS EC2** deployment ready
 - **@modelcontextprotocol/sdk** for MCP

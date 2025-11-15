@@ -37,7 +37,7 @@ check_prerequisites() {
     local missing_deps=()
     
     if ! command -v node &> /dev/null; then
-        missing_deps+=("Node.js 18+")
+        missing_deps+=("Node.js 20+")
     fi
     
     if ! command -v npm &> /dev/null; then
@@ -62,8 +62,8 @@ check_prerequisites() {
     NODE_VERSION=$(node --version | cut -d'v' -f2)
     NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1)
     
-    if [ "$NODE_MAJOR" -lt 18 ]; then
-        print_error "Node.js 18+ required, found $NODE_VERSION"
+    if [ "$NODE_MAJOR" -lt 20 ]; then
+        print_error "Node.js 20+ required, found $NODE_VERSION"
         exit 1
     fi
     

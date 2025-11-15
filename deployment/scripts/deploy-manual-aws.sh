@@ -93,9 +93,9 @@ deploy_to_manual_instance() {
         fi
         
         # Install Git and Node.js
-        print_status "Installing Git and Node.js..."
+        print_status "Installing Git and Node.js 20 LTS..."
         sudo yum install -y git
-        curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
         sudo yum install -y nodejs
         
         # Create application directory
