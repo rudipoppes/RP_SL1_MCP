@@ -194,13 +194,23 @@ CLONE_EOF
             print_warning "Please edit config.json with your Restorepoint details"
         fi
         
-        # Install Node.js dependencies
-        print_status "Installing Node.js dependencies..."
-        npm install --production
+        # Install Node.js dependencies (including devDependencies for build)
+        print_status "Installing all dependencies for TypeScript build..."
+        npm install
         
-        # Build the application
-        print_status "Building application..."
+        # Build the application from TypeScript
+        print_status "Building TypeScript application..."
         npm run build
+        
+        # Verify build was successful
+        if [ ! -f "dist/server.js" ]; then
+            print_error "❌ Build failed - dist/server.js not found"
+            exit 1
+        fi
+        
+        # Install only production dependencies for runtime
+        print_status "Installing production dependencies..."
+        npm ci --omit=dev
         
         # Start the MCP server as a background service
         print_status "Starting MCP server..."
@@ -251,7 +261,7 @@ Group=ec2-user
 Environment=NODE_ENV=production
 Environment=ENABLE_HTTP_SERVER=true
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/node dist/server.js
+ExecStart=/opt/restorepoint/RP_SL1_MCP/dist/server.js
 Restart=always
 RestartSec=10
 StandardOutput=syslog
