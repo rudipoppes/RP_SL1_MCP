@@ -122,26 +122,10 @@ deploy_to_manual_instance() {
         print_status "✅ EC2 instance setup completed"
 SETUP_EOF
     
-    # Copy files from local machine
-    print_status "Copying application files to EC2..."
+    # Clone repository from GitHub
+    print_status "Cloning repository from GitHub..."
     
-    # Create tar archive and upload
-    print_status "Creating deployment archive..."
-    tar czf deployment.tar.gz \
-        --exclude='.git' \
-        --exclude='node_modules' \
-        --exclude='dist' \
-        --exclude='logs' \
-        --exclude='.claude' \
-        --exclude='*.log' \
-        .
-    
-    print_status "Uploading deployment archive..."
-    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" deployment.tar.gz \
-        ec2-user@"$EC2_IP":/tmp/deployment.tar.gz
-    
-    print_status "Extracting archive on EC2..."
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'EXTRACT_EOF'
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << CLONE_EOF
         set -e
         
         print_status() {
@@ -153,18 +137,18 @@ SETUP_EOF
         # Remove old deployment
         rm -rf RP_SL1_MCP
         
-        # Extract archive
-        print_status "Extracting deployment archive..."
-        tar xzf /tmp/deployment.tar.gz
-        mv deployment RP_SL1_MCP
+        # Clone repository
+        print_status "Cloning from GitHub..."
+        git clone "$REPO_URL" RP_SL1_MCP
         cd RP_SL1_MCP
         
-        print_status "✅ Archive extracted successfully"
-        rm -f /tmp/deployment.tar.gz
-EXTRACT_EOF
-    
-    # Clean up local archive
-    rm -f deployment.tar.gz
+        # Checkout specific branch if not main
+        if [ "$BRANCH" != "main" ]; then
+            git checkout "$BRANCH"
+        fi
+        
+        print_status "✅ Repository cloned successfully"
+CLONE_EOF
     
         
     # Deploy on EC2
