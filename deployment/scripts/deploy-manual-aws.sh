@@ -108,6 +108,16 @@ deploy_to_manual_instance() {
             print_status "Docker already installed"
         fi
         
+        # Install Docker Compose
+        print_status "Installing Docker Compose..."
+        if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            print_status "Docker Compose installed"
+        else
+            print_status "Docker Compose already installed"
+        fi
+        
         # Install Git and Node.js
         print_status "Installing Git and Node.js 22 LTS..."
         sudo yum install -y git
