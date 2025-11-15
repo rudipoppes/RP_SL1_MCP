@@ -10,7 +10,7 @@ set -e
 # Configuration
 EC2_IP="${EC2_IP:-}"  # Your EC2 instance IP address
 SSH_KEY="${SSH_KEY:-~/.ssh/your-key-pair.pem}"  # Path to your SSH key
-REPO_URL="${REPO_URL:-https://github.com/rudipoppes/RP_SL1_MCP.git}"
+REPO_URL="${REPO_URL:-}"
 BRANCH="${BRANCH:-main}"
 
 # Colors for output
@@ -45,6 +45,22 @@ get_ec2_ip() {
     fi
     
     print_status "Using EC2 IP: $EC2_IP"
+}
+
+# Get GitHub repository URL
+get_repo_info() {
+    if [ -z "$REPO_URL" ]; then
+        echo "Enter your GitHub repository URL:"
+        echo "Example: https://github.com/username/RP_SL1_MCP.git"
+        read -p "GitHub Repo URL: " REPO_URL
+    fi
+    
+    if [ -z "$REPO_URL" ]; then
+        print_error "GitHub repository URL is required. Use: REPO_URL=https://github.com/username/RP_SL1_MCP.git $0"
+        exit 1
+    fi
+    
+    print_status "Using GitHub repo: $REPO_URL"
 }
 
 # Check SSH key exists
@@ -109,9 +125,23 @@ SETUP_EOF
     # Copy files from local machine
     print_status "Copying application files to EC2..."
     
-    # Clone from GitHub instead of copying files
-    print_status "Cloning from GitHub..."
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'CLONE_EOF'
+    # Create tar archive and upload
+    print_status "Creating deployment archive..."
+    tar czf deployment.tar.gz \
+        --exclude='.git' \
+        --exclude='node_modules' \
+        --exclude='dist' \
+        --exclude='logs' \
+        --exclude='.claude' \
+        --exclude='*.log' \
+        .
+    
+    print_status "Uploading deployment archive..."
+    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" deployment.tar.gz \
+        ec2-user@"$EC2_IP":/tmp/deployment.tar.gz
+    
+    print_status "Extracting archive on EC2..."
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'EXTRACT_EOF'
         set -e
         
         print_status() {
@@ -123,13 +153,18 @@ SETUP_EOF
         # Remove old deployment
         rm -rf RP_SL1_MCP
         
-        # Clone from GitHub
-        print_status "Cloning repository from GitHub..."
-        git clone https://github.com/rudipoppes/RP_SL1_MCP.git RP_SL1_MCP
+        # Extract archive
+        print_status "Extracting deployment archive..."
+        tar xzf /tmp/deployment.tar.gz
+        mv deployment RP_SL1_MCP
         cd RP_SL1_MCP
         
-        print_status "✅ Repository cloned successfully"
-CLONE_EOF
+        print_status "✅ Archive extracted successfully"
+        rm -f /tmp/deployment.tar.gz
+EXTRACT_EOF
+    
+    # Clean up local archive
+    rm -f deployment.tar.gz
     
         
     # Deploy on EC2
@@ -325,9 +360,11 @@ main() {
     echo ""
     
     get_ec2_ip
+    get_repo_info
     check_ssh_key
     deploy_to_manual_instance
     verify_deployment
+}
     
     echo ""
     print_header "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
