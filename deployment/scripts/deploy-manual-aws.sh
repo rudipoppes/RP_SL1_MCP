@@ -114,7 +114,7 @@ SETUP_EOF
     
     # Copy all files excluding node_modules and .git
     rsync -avz --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='logs' \
-        -e "ssh -o StrictHostKeyChecking=no -i $SSH_KEY" \
+        -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
         . ec2-user@"$EC2_IP":/tmp/deploy/
     
     # Deploy on EC2
