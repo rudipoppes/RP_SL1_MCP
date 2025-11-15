@@ -122,21 +122,6 @@ deploy_to_manual_instance() {
         print_status "✅ EC2 instance setup completed"
 SETUP_EOF
     
-    # Get GitHub token for private repository
-    get_github_token() {
-        echo "Enter your GitHub personal access token:"
-        echo "Create one at: https://github.com/settings/tokens"
-        read -s -p "GitHub Token: " GITHUB_TOKEN
-        echo ""
-        
-        if [ -z "$GITHUB_TOKEN" ]; then
-            print_error "GitHub token is required for private repository access"
-            exit 1
-        fi
-    }
-    
-    get_github_token
-    
     # Clone repository from GitHub
     print_status "Cloning repository from GitHub..."
     
@@ -145,7 +130,6 @@ SETUP_EOF
         
         # Set variables from local environment
         REPO_URL="$REPO_URL"
-        GITHUB_TOKEN="$GITHUB_TOKEN"
         BRANCH="$BRANCH"
         
         print_status() {
@@ -157,12 +141,9 @@ SETUP_EOF
         # Remove old deployment
         rm -rf RP_SL1_MCP
         
-        # Clone repository with token
+        # Clone repository
         print_status "Cloning from GitHub..."
-        
-        # Create URL with token and clone directly
-        REPO_WITH_TOKEN="\$(echo "\$REPO_URL" | sed "s|https://github.com/|https://\$GITHUB_TOKEN@github.com/|")"
-        git clone "\$REPO_WITH_TOKEN" RP_SL1_MCP
+        git clone "\$REPO_URL" RP_SL1_MCP
         cd RP_SL1_MCP
         
         # Checkout specific branch if not main
@@ -324,9 +305,7 @@ usage() {
     echo "  BRANCH                  Git branch"
     echo ""
     echo "Repository URL Format:"
-    echo "  Use standard GitHub URL: https://github.com/user/repo.git"
-    echo "  Script will prompt for GitHub token if needed"
-    echo "  Create token at: https://github.com/settings/tokens"
+    echo "  Use GitHub URL: https://github.com/user/repo.git"
     echo ""
     echo "Examples:"
     echo "  $0 --ip 1.2.3.4 --repo https://github.com/user/repo.git"
