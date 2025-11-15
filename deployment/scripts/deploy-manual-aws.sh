@@ -109,47 +109,27 @@ SETUP_EOF
     # Copy files from local machine
     print_status "Copying application files to EC2..."
     
-    # Create temp directory and copy files
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "mkdir -p /tmp/deploy"
-    
-    # Copy all source files excluding large directories
-    print_status "Copying application files..."
-    
-    # First copy essential files
-    rsync -avz --progress \
-        package.json \
-        package-lock.json \
-        tsconfig.json \
-        jest.config.cjs \
-        .eslintrc.js \
-        .prettierrc.json \
-        .dockerignore \
-        Dockerfile \
-        docker-compose*.yml \
-        config.json.example \
-        -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
-        ec2-user@"$EC2_IP":/tmp/deploy/
-    
-    # Then copy source code and documentation
-    rsync -avz --progress \
-        --exclude='.git/' \
-        --exclude='node_modules/' \
-        --exclude='dist/' \
-        --exclude='logs/' \
-        --exclude='.claude/' \
-        --exclude='*.log' \
-        src/ \
-        docs/ \
-        scripts/ \
-        types/ \
-        utils/ \
-        constants/ \
-        auth/ \
-        tools/ \
-        config/ \
-        *.md \
-        -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
-        . ec2-user@"$EC2_IP":/tmp/deploy/
+    # Clone from GitHub instead of copying files
+    print_status "Cloning from GitHub..."
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << 'CLONE_EOF'
+        set -e
+        
+        print_status() {
+            echo -e "\033[0;32m[INFO]\033[0m $1"
+        }
+        
+        cd /opt/restorepoint
+        
+        # Remove old deployment
+        rm -rf RP_SL1_MCP
+        
+        # Clone from GitHub
+        print_status "Cloning repository from GitHub..."
+        git clone https://github.com/rudipoppes/RP_SL1_MCP.git RP_SL1_MCP
+        cd RP_SL1_MCP
+        
+        print_status "✅ Repository cloned successfully"
+CLONE_EOF
     
         
     # Deploy on EC2
@@ -165,12 +145,7 @@ SETUP_EOF
             echo -e "\033[0;31m[ERROR]\033[0m $1"
         }
         
-        cd /opt/restorepoint
-        
-        # Remove old deployment and move new files
-        rm -rf RP_SL1_MCP
-        mv /tmp/deploy RP_SL1_MCP
-        cd RP_SL1_MCP
+        cd /opt/restorepoint/RP_SL1_MCP
         
         # Install dependencies
         print_status "Installing Node.js dependencies..."
