@@ -154,8 +154,13 @@ SETUP_EOF
         
         # Clone repository with token
         print_status "Cloning from GitHub..."
-        # Extract username from repo URL and add token
-        REPO_WITH_TOKEN="\$(echo "$REPO_URL" | sed 's|https://github.com/|https://$GITHUB_TOKEN@github.com/|')"
+        print_status "Original repo: $REPO_URL"
+        print_status "Token length: ${#GITHUB_TOKEN}"
+        
+        # Create URL with token
+        REPO_WITH_TOKEN="\$(echo "$REPO_URL" | sed "s|https://github.com/|https://$GITHUB_TOKEN@github.com/|")"
+        print_status "Repo with token: \$REPO_WITH_TOKEN"
+        
         git clone "\$REPO_WITH_TOKEN" RP_SL1_MCP
         cd RP_SL1_MCP
         
