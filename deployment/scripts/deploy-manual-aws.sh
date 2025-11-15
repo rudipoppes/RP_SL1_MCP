@@ -109,9 +109,9 @@ deploy_to_manual_instance() {
         fi
         
         # Install Git and Node.js
-        print_status "Installing Git and Node.js 20 LTS..."
+        print_status "Installing Git and Node.js 22 LTS..."
         sudo yum install -y git
-        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
         sudo yum install -y nodejs
         
         # Create application directory
@@ -172,12 +172,8 @@ CLONE_EOF
         
         # Install dependencies
         print_status "Installing Node.js dependencies..."
-        if [ -f "package-lock.json" ]; then
-            npm ci
-        else
-            print_status "package-lock.json not found, using npm install"
-            npm install
-        fi
+        # Always use npm install to avoid lock file issues
+        npm install
         
         # Build application
         print_status "Building application..."
