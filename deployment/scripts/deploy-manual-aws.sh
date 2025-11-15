@@ -113,7 +113,8 @@ SETUP_EOF
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "mkdir -p /tmp/deploy"
     
     # Copy all source files excluding large directories
-    rsync -avz \
+    print_status "Copying application files..."
+    rsync -avz --progress \
         --exclude='.git/' \
         --exclude='node_modules/' \
         --exclude='dist/' \
@@ -122,6 +123,10 @@ SETUP_EOF
         --exclude='*.log' \
         -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
         . ec2-user@"$EC2_IP":/tmp/deploy/
+    
+    # Verify files were copied
+    print_status "Verifying copied files..."
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "ls -la /tmp/deploy/ | head -10"
     
     # Deploy on EC2
     print_status "Deploying application on EC2..."
