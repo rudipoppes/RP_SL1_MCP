@@ -125,13 +125,12 @@ SETUP_EOF
     # Clone repository from GitHub
     print_status "Cloning repository from GitHub..."
     
-    # For private repos, we can use SSH or token-based read access
     # The EC2 instance just needs to read/clone, not write to the repo
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << CLONE_EOF
         set -e
         
         print_status() {
-            echo -e "\033[0;32m[INFO]\033[0m $1"
+            echo -e "\033[0;32m[INFO]\033[0m \$1"
         }
         
         cd /opt/restorepoint
@@ -139,9 +138,8 @@ SETUP_EOF
         # Remove old deployment
         rm -rf RP_SL1_MCP
         
-        # Clone repository (read-only access)
+        # Clone repository
         print_status "Cloning from GitHub..."
-        # For private repos, GitHub token should be in the URL for read access
         git clone "$REPO_URL" RP_SL1_MCP
         cd RP_SL1_MCP
         
