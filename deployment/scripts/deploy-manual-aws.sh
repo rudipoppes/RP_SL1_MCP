@@ -226,7 +226,7 @@ CLONE_EOF
         
         # Build Docker image
         print_status "Building Docker image..."
-        docker build -t rp-sl1-mcp .
+        docker build --no-cache -t rp-sl1-mcp .
         
         # Stop and remove existing container if it exists
         print_status "Cleaning up existing container..."
