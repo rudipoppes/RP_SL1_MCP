@@ -114,6 +114,23 @@ SETUP_EOF
     
     # Copy all source files excluding large directories
     print_status "Copying application files..."
+    
+    # First copy essential files
+    rsync -avz --progress \
+        package.json \
+        package-lock.json \
+        tsconfig.json \
+        jest.config.cjs \
+        .eslintrc.js \
+        .prettierrc.json \
+        .dockerignore \
+        Dockerfile \
+        docker-compose*.yml \
+        config.json.example \
+        -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
+        ec2-user@"$EC2_IP":/tmp/deploy/
+    
+    # Then copy source code and documentation
     rsync -avz --progress \
         --exclude='.git/' \
         --exclude='node_modules/' \
@@ -121,6 +138,16 @@ SETUP_EOF
         --exclude='logs/' \
         --exclude='.claude/' \
         --exclude='*.log' \
+        src/ \
+        docs/ \
+        scripts/ \
+        types/ \
+        utils/ \
+        constants/ \
+        auth/ \
+        tools/ \
+        config/ \
+        *.md \
         -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
         . ec2-user@"$EC2_IP":/tmp/deploy/
     
