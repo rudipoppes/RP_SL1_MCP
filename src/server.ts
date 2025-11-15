@@ -54,12 +54,11 @@ class RestorepointMCPServer {
    */
   public async initialize(): Promise<void> {
     try {
-      Logger.logWithContext('info', 'Initializing Restorepoint MCP Server', 'MCPServer');
-
       // Load configuration
       const config = await configManager.loadConfig();
       Logger.initialize(config);
 
+      Logger.logWithContext('info', 'Initializing Restorepoint MCP Server', 'MCPServer');
       Logger.logWithContext('info', 'Configuration loaded successfully', 'MCPServer');
       Logger.logWithContext('info', `Restorepoint server: ${config.restorepoint.serverUrl}`, 'MCPServer');
       Logger.logWithContext('info', `API version: ${config.restorepoint.apiVersion}`, 'MCPServer');
