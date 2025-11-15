@@ -140,13 +140,13 @@ SETUP_EOF
     # Clone repository from GitHub
     print_status "Cloning repository from GitHub..."
     
-    # Export variables for SSH session
-    export REPO_URL
-    export GITHUB_TOKEN
-    export BRANCH
-    
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << CLONE_EOF
         set -e
+        
+        # Set variables from local environment
+        REPO_URL="$REPO_URL"
+        GITHUB_TOKEN="$GITHUB_TOKEN"
+        BRANCH="$BRANCH"
         
         print_status() {
             echo -e "\033[0;32m[INFO]\033[0m \$1"
