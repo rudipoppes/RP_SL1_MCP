@@ -120,13 +120,16 @@ deploy_to_manual_instance() {
         
         # Install Docker Buildx
         print_status "Installing Docker Buildx..."
-        if ! docker buildx version &> /dev/null; then
+        if ! docker buildx ls &> /dev/null; then
             sudo yum install -y docker-buildx-plugin
-            docker buildx install
             print_status "Docker Buildx installed"
         else
             print_status "Docker Buildx already available"
         fi
+        
+        # Enable buildx for current user
+        docker buildx install || true
+        docker buildx create --use --name default || true
         
         # Install Git and Node.js
         print_status "Installing Git and Node.js 22 LTS..."
@@ -220,7 +223,7 @@ CLONE_EOF
         
         # Start the service
         print_status "Starting MCP server..."
-        ENABLE_HTTP_SERVER=true docker-compose up -d
+        ENABLE_HTTP_SERVER=true docker-compose up -d --no-build
         
         # Wait for startup
         sleep 30
