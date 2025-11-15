@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # MCP Server Production
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: restorepoint/mcp-server:latest
+    container_name: rp-sl1-mcp-prod
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - TZ=UTC
+    ports:
+      - "3000:3000"  # HTTP transport port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - restorepoint-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: rp-sl1-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - mcp-server
+    networks:
+      - restorepoint-network
+    profiles:
+      - nginx  # Only start with --profile nginx
+
+networks:
+  restorepoint-network:
+    driver: bridge
+    name: restorepoint-network
+
+volumes:
+  logs:
+    driver: local

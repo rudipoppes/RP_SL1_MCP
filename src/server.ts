@@ -689,11 +689,71 @@ class RestorepointMCPServer {
 }
 
 /**
+ * Start HTTP server for health checks (optional)
+ * Only starts if ENABLE_HTTP_SERVER=true or in production
+ */
+async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> {
+  if (process.env.ENABLE_HTTP_SERVER === 'true' || process.env.NODE_ENV === 'production') {
+    try {
+      // Dynamic import for express to avoid dependency if not needed
+      const express = await import('express');
+      const app = express.default();
+      const port = process.env.PORT || 3000;
+
+      // Health check endpoint
+      app.get('/health', (req, res) => {
+        const isHealthy = mcpServer['apiClient'] !== undefined;
+        const status = {
+          status: isHealthy ? 'healthy' : 'unhealthy',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          server: MCP_CONSTANTS.SERVER_NAME,
+          version: MCP_CONSTANTS.SERVER_VERSION,
+          tools: mcpServer['tools']?.length || 0
+        };
+        
+        res.status(isHealthy ? 200 : 503).json(status);
+      });
+
+      // Basic info endpoint
+      app.get('/info', (req, res) => {
+        res.json({
+          server: MCP_CONSTANTS.SERVER_NAME,
+          version: MCP_CONSTANTS.SERVER_VERSION,
+          tools: mcpServer['tools']?.map(tool => ({
+            name: tool.name,
+            description: tool.description
+          })) || [],
+          endpoints: {
+            health: '/health',
+            info: '/info',
+            mcp: 'stdio (MCP protocol)'
+          }
+        });
+      });
+
+      app.listen(port, '0.0.0.0', () => {
+        Logger.logWithContext('info', `HTTP server listening on port ${port}`, 'MCPServer');
+        Logger.logWithContext('info', `Health endpoint: http://localhost:${port}/health`, 'MCPServer');
+        Logger.logWithContext('info', `Info endpoint: http://localhost:${port}/info`, 'MCPServer');
+      });
+    } catch (error) {
+      Logger.logWithContext('warn', 'Failed to start HTTP server (express not available)', 'MCPServer', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
   const server = new RestorepointMCPServer();
   await server.start();
+  
+  // Start HTTP server for health checks (if enabled)
+  await startHttpServer(server);
 }
 
 // Start the server if this file is executed directly

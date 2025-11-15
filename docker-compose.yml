@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # MCP Server Development
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use build stage for development
+    container_name: rp-sl1-mcp-dev
+    working_dir: /app
+    command: npm run dev
+    volumes:
+      # Mount source code for live reloading
+      - ./src:/app/src
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+      - TZ=UTC
+    ports:
+      - "3000:3000"  # If using HTTP transport
+    restart: unless-stopped
+    healthcheck:
+      disable: true  # Disable in development
+    networks:
+      - restorepoint-network
+
+  # MCP Inspector (for development testing)
+  mcp-inspector:
+    image: node:18-alpine
+    container_name: rp-sl1-mcp-inspector
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/inspector && 
+             npx tsx watch /app/src/server.ts | npx mcp-inspector"
+    volumes:
+      - ./src:/app/src
+      - ./config.json:/app/config.json:ro
+    ports:
+      - "3000:3000"  # Inspector UI
+    depends_on:
+      - mcp-server
+    networks:
+      - restorepoint-network
+    profiles:
+      - inspector  # Only start with --profile inspector
+
+networks:
+  restorepoint-network:
+    driver: bridge
+    name: restorepoint-network
+
+volumes:
+  logs:
+    driver: local
