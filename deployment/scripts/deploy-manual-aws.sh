@@ -221,9 +221,17 @@ CLONE_EOF
         print_status "Building Docker image..."
         docker build -t rp-sl1-mcp .
         
-        # Start the service
+        # Start the service directly
         print_status "Starting MCP server..."
-        ENABLE_HTTP_SERVER=true docker-compose up -d --no-build
+        docker run -d \
+            --name rp-sl1-mcp \
+            --restart unless-stopped \
+            -p 3000:3000 \
+            -e ENABLE_HTTP_SERVER=true \
+            -e NODE_ENV=production \
+            -v /opt/restorepoint/RP_SL1_MCP/config.json:/app/config.json:ro \
+            -v /opt/restorepoint/RP_SL1_MCP/logs:/app/logs \
+            rp-sl1-mcp
         
         # Wait for startup
         sleep 30
@@ -256,8 +264,10 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/restorepoint/RP_SL1_MCP
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
+ExecStart=/usr/bin/docker run -d --name rp-sl1-mcp --restart unless-stopped -p 3000:3000 -e ENABLE_HTTP_SERVER=true -e NODE_ENV=production -v /opt/restorepoint/RP_SL1_MCP/config.json:/app/config.json:ro -v /opt/restorepoint/RP_SL1_MCP/logs:/app/logs rp-sl1-mcp
+ExecStartPost=/usr/bin/sleep 5
+ExecStop=/usr/bin/docker stop rp-sl1-mcp
+ExecStopPost=/usr/bin/docker rm rp-sl1-mcp
 TimeoutStartSec=0
 User=ec2-user
 Group=ec2-user
