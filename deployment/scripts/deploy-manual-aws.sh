@@ -111,12 +111,12 @@ deploy_to_manual_instance() {
         if [ -d "RP_SL1_MCP" ]; then
             rm -rf RP_SL1_MCP
         fi
-        git clone REPO_URL_PLACEHOLDER RP_SL1_MCP
+        git clone https://github.com/rudipoppes/RP_SL1_MCP.git RP_SL1_MCP
         cd RP_SL1_MCP
         
         # Checkout specific branch if needed
-        if [ "BRANCH_PLACEHOLDER" != "main" ]; then
-            git checkout BRANCH_PLACEHOLDER
+        if [ "main" != "main" ]; then
+            git checkout main
         fi
         
         # Install dependencies
@@ -198,11 +198,6 @@ SERVICE_EOF
         
         print_status "✅ Systemd service created and enabled"
 DEPLOY_EOF
-
-    # Replace placeholders in the script
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "sed -i 's|REPO_URL_PLACEHOLDER|$REPO_URL|g' /opt/restorepoint/RP_SL1_MCP/deploy.sh"
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "sed -i 's|BRANCH_PLACEHOLDER|$BRANCH|g' /opt/restorepoint/RP_SL1_MCP/deploy.sh"
-    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "cd /opt/restorepoint/RP_SL1_MCP && ./deploy.sh"
     
     if [ $? -eq 0 ]; then
         print_status "✅ Deployment completed successfully!"
