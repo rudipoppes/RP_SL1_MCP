@@ -208,6 +208,16 @@ CLONE_EOF
             exit 1
         fi
         
+        # Debug: Check if Logger fix is in compiled code
+        print_status "Debugging compiled code..."
+        if grep -q "Initialize Logger before usage" dist/server.js; then
+            print_status "✅ Logger fix found in compiled code"
+        else
+            print_error "❌ Logger fix NOT found in compiled code - still using old code"
+            print_error "Checking around line 684 in dist/server.js:"
+            sed -n '680,690p' dist/server.js
+        fi
+        
         # Install only production dependencies for runtime
         print_status "Installing production dependencies..."
         npm ci --omit=dev
