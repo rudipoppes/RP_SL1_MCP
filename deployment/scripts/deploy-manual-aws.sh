@@ -125,23 +125,8 @@ SETUP_EOF
     # Clone repository from GitHub
     print_status "Cloning repository from GitHub..."
     
-    # Extract GitHub token from URL or prompt for it
-    get_github_credentials() {
-        if [ -z "$GITHUB_TOKEN" ]; then
-            echo "Enter your GitHub personal access token (for private repository):"
-            echo "Create one at: https://github.com/settings/tokens"
-            read -s -p "GitHub Token: " GITHUB_TOKEN
-            echo ""
-        fi
-        
-        if [ -z "$GITHUB_TOKEN" ]; then
-            print_error "GitHub token is required for private repository access"
-            exit 1
-        fi
-    }
-    
-    get_github_credentials
-    
+    # For private repos, we can use SSH or token-based read access
+    # The EC2 instance just needs to read/clone, not write to the repo
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" << CLONE_EOF
         set -e
         
@@ -154,15 +139,11 @@ SETUP_EOF
         # Remove old deployment
         rm -rf RP_SL1_MCP
         
-        # Clone repository with token
+        # Clone repository (read-only access)
         print_status "Cloning from GitHub..."
-        # Convert HTTPS URL to include token
-        REPO_URL_WITH_TOKEN="\$(echo "$REPO_URL" | sed 's|https://github.com/|https://$GITHUB_TOKEN@github.com/|')"
-        git clone "\$REPO_URL_WITH_TOKEN" RP_SL1_MCP
+        # For private repos, GitHub token should be in the URL for read access
+        git clone "$REPO_URL" RP_SL1_MCP
         cd RP_SL1_MCP
-        
-        # Remove token from git config to avoid exposure
-        git remote set-url origin "$REPO_URL"
         
         # Checkout specific branch if not main
         if [ "$BRANCH" != "main" ]; then
@@ -321,13 +302,16 @@ usage() {
     echo "  SSH_KEY                 SSH key path"
     echo "  REPO_URL                Git repository URL"
     echo "  BRANCH                  Git branch"
-    echo "  GITHUB_TOKEN            GitHub personal access token (for private repos)"
+    echo ""
+    echo "Repository URL Formats:"
+    echo "  Public:  https://github.com/user/repo.git"
+    echo "  Private: https://YOUR_TOKEN@github.com/user/repo.git"
+    echo "           (Create token at: https://github.com/settings/tokens)"
     echo ""
     echo "Examples:"
-    echo "  $0 --ip 1.2.3.4"
-    echo "  $0 --ip 1.2.3.4 --key ~/.ssh/my-key.pem"
-    echo "  GITHUB_TOKEN=your_token $0 --ip 1.2.3.4"
-    echo "  EC2_IP=1.2.3.4 $0"
+    echo "  $0 --ip 1.2.3.4 --repo https://github.com/user/repo.git"
+    echo "  $0 --ip 1.2.3.4 --repo https://TOKEN@github.com/user/repo.git"
+    echo "  EC2_IP=1.2.3.4 REPO_URL=https://TOKEN@github.com/user/repo.git $0"
 }
 
 # Parse command line arguments
