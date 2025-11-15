@@ -108,7 +108,7 @@ deploy_to_manual_instance() {
             print_status "Docker already installed"
         fi
         
-        # Install Docker Compose
+        # Install Docker Compose and Docker Buildx
         print_status "Installing Docker Compose..."
         if ! command -v docker-compose &> /dev/null; then
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -116,6 +116,16 @@ deploy_to_manual_instance() {
             print_status "Docker Compose installed"
         else
             print_status "Docker Compose already installed"
+        fi
+        
+        # Install Docker Buildx
+        print_status "Installing Docker Buildx..."
+        if ! docker buildx version &> /dev/null; then
+            sudo yum install -y docker-buildx-plugin
+            docker buildx install
+            print_status "Docker Buildx installed"
+        else
+            print_status "Docker Buildx already available"
         fi
         
         # Install Git and Node.js

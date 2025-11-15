@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MCP Server Development
   mcp-server:
@@ -28,7 +26,7 @@ services:
 
   # MCP Inspector (for development testing)
   mcp-inspector:
-    image: node:18-alpine
+    image: node:22-alpine
     container_name: rp-sl1-mcp-inspector
     command: >
       sh -c "npm install -g @modelcontextprotocol/inspector && 
