@@ -221,6 +221,11 @@ CLONE_EOF
         print_status "Building Docker image..."
         docker build -t rp-sl1-mcp .
         
+        # Stop and remove existing container if it exists
+        print_status "Cleaning up existing container..."
+        docker stop rp-sl1-mcp 2>/dev/null || true
+        docker rm rp-sl1-mcp 2>/dev/null || true
+        
         # Start the service directly
         print_status "Starting MCP server..."
         docker run -d \
