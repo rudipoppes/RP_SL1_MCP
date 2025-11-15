@@ -112,8 +112,9 @@ SETUP_EOF
     # Create temp directory and copy files
     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ec2-user@"$EC2_IP" "mkdir -p /tmp/deploy"
     
-    # Copy all files excluding node_modules and .git
+    # Copy all files excluding node_modules and .git, but include package-lock.json
     rsync -avz --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='logs' \
+        --include='package-lock.json' --include='package*.json' \
         -e "ssh -o StrictHostKeyChecking=no -i '$SSH_KEY'" \
         . ec2-user@"$EC2_IP":/tmp/deploy/
     
@@ -139,7 +140,12 @@ SETUP_EOF
         
         # Install dependencies
         print_status "Installing Node.js dependencies..."
-        npm ci
+        if [ -f "package-lock.json" ]; then
+            npm ci
+        else
+            print_status "package-lock.json not found, using npm install"
+            npm install
+        fi
         
         # Build application
         print_status "Building application..."
