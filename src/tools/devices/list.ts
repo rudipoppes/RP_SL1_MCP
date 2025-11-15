@@ -3,11 +3,11 @@
  * Provides functionality to list and filter devices from Restorepoint
  */
 
-import type { McpTool, McpResult } from '@/types/mcp-tools.js';
-import { ERROR_CODES, RestorepointError } from '@/constants/error-codes.js';
-import { InputValidator, DeviceSchemas } from '@/utils/validators.js';
-import { Logger } from '@/utils/logger.js';
-import type { ApiClient } from '@/auth/api-client.js';
+import type { McpTool, McpResult } from '../../types/mcp-tools.js';
+import { ERROR_CODES, RestorepointError } from '../../constants/error-codes.js';
+import { InputValidator, DeviceSchemas } from '../../utils/validators.js';
+import { Logger } from '../../utils/logger.js';
+import type { ApiClient } from '../../auth/api-client.js';
 
 /**
  * Handle list devices request

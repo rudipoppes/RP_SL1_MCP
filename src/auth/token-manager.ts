@@ -1,6 +1,6 @@
 import type { AuthToken, TokenValidationResult, TokenEvents } from './types.js';
-import { ERROR_CODES, RestorepointError } from '@/constants/error-codes.js';
-import { Logger } from '@/utils/logger.js';
+import { ERROR_CODES, RestorepointError } from '../constants/error-codes.js';
+import { Logger } from '../utils/logger.js';
 
 /**
  * Token manager for handling authentication tokens

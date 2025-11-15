@@ -1,10 +1,10 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
-import type { AppConfig } from '@/config/types.js';
-import { HTTP_STATUS_CODES, RESTOREPOINT_ENDPOINTS } from '@/constants/endpoints.js';
-import { ERROR_CODES, RestorepointError } from '@/constants/error-codes.js';
-import { tokenManager } from '@/auth/token-manager.js';
-import { errorHandler } from '@/utils/error-handler.js';
-import { Logger } from '@/utils/logger.js';
+import type { AppConfig } from '../config/types.js';
+import { HTTP_STATUS_CODES, RESTOREPOINT_ENDPOINTS } from '../constants/endpoints.js';
+import { ERROR_CODES, RestorepointError } from '../constants/error-codes.js';
+import { tokenManager } from './token-manager.js';
+import { errorHandler } from '../utils/error-handler.js';
+import { Logger } from '../utils/logger.js';
 
 /**
  * API response wrapper

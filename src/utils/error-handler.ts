@@ -1,7 +1,7 @@
-import type { RestorepointError } from '@/constants/error-codes.js';
-import { ERROR_CODES, RestorepointError as RestorepointErrorClass } from '@/constants/error-codes.js';
-import { HTTP_STATUS_CODES } from '@/constants/endpoints.js';
-import { Logger } from '@/utils/logger.js';
+import type { RestorepointError } from '../constants/error-codes.js';
+import { ERROR_CODES, RestorepointError as RestorepointErrorClass } from '../constants/error-codes.js';
+import { HTTP_STATUS_CODES } from '../constants/endpoints.js';
+import { Logger } from './logger.js';
 
 /**
  * Error response structure for consistent API responses

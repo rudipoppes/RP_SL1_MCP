@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { RestorepointError } from '@/constants/error-codes.js';
-import { ERROR_CODES, RestorepointError as RestorepointErrorClass } from '@/constants/error-codes.js';
+import type { RestorepointError } from '../constants/error-codes.js';
+import { ERROR_CODES, RestorepointError as RestorepointErrorClass } from '../constants/error-codes.js';
 
 /**
  * Input validation utilities using Zod schemas

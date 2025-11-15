@@ -1,5 +1,5 @@
 import winston from 'winston';
-import type { AppConfig } from '@/config/types.js';
+import type { AppConfig } from '../config/types.js';
 
 /**
  * Professional logging utility using Winston
