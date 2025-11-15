@@ -34,6 +34,13 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)\\.(js|ts)$': '<rootDir>/src/$1.ts',
     '^@/(.*)$': '<rootDir>/src/$1.ts',
+    // Add mappings for relative imports that Jest can't resolve
+    '^../constants/(.*)$': '<rootDir>/src/constants/$1.ts',
+    '^../config/(.*)$': '<rootDir>/src/config/$1.ts',
+    '^../utils/(.*)$': '<rootDir>/src/utils/$1.ts',
+    '^../auth/(.*)$': '<rootDir>/src/auth/$1.ts',
+    '^../tools/(.*)$': '<rootDir>/src/tools/$1.ts',
+    '^../types/(.*)$': '<rootDir>/src/types/$1.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(.*)\\.mjs$)'

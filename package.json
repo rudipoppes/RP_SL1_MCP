@@ -20,13 +20,10 @@
     "generate-types": "tsx scripts/generate-types.ts",
     "validate-config": "tsx scripts/validate-config.ts",
     "precommit": "npm run type-check && npm run lint && npm run test",
-    "docker:build": "docker build -t rp-sl1-mcp .",
-    "docker:run": "docker-compose up -d",
-    "docker:dev": "ENABLE_HTTP_SERVER=true docker-compose up",
-    "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d",
-    "docker:stop": "docker-compose down",
-    "docker:logs": "docker-compose logs -f mcp-server",
-    "docker:clean": "docker-compose down -v && docker system prune -f"
+    "prod:start": "ENABLE_HTTP_SERVER=true NODE_ENV=production npm start",
+    "prod:stop": "pkill -f 'node.*server.js'",
+    "prod:logs": "tail -f logs/mcp-server.log",
+    "prod:status": "curl -f http://localhost:3000/health 2>/dev/null && echo 'Running' || echo 'Stopped'"
   },
   "keywords": [
     "mcp",

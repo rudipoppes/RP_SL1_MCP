@@ -96,41 +96,7 @@ deploy_to_manual_instance() {
         print_status "Updating system packages..."
         sudo yum update -y
         
-        # Install Docker
-        print_status "Installing Docker..."
-        if ! command -v docker &> /dev/null; then
-            sudo yum install -y docker
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -a -G docker ec2-user
-            print_status "Docker installed and started"
-        else
-            print_status "Docker already installed"
-        fi
-        
-        # Install Docker Compose and Docker Buildx
-        print_status "Installing Docker Compose..."
-        if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            print_status "Docker Compose installed"
-        else
-            print_status "Docker Compose already installed"
-        fi
-        
-        # Install Docker Buildx
-        print_status "Installing Docker Buildx..."
-        if ! docker buildx ls &> /dev/null; then
-            sudo yum install -y docker-buildx-plugin
-            print_status "Docker Buildx installed"
-        else
-            print_status "Docker Buildx already available"
-        fi
-        
-        # Enable buildx for current user
-        docker buildx install || true
-        docker buildx create --use --name default || true
-        
+                
         # Install Git and Node.js
         print_status "Installing Git and Node.js 22 LTS..."
         sudo yum install -y git
@@ -193,6 +159,10 @@ CLONE_EOF
         
         cd /opt/restorepoint/RP_SL1_MCP
         
+        # Add Node.js 22 to PATH
+        echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+        export PATH="/usr/local/bin:$PATH"
+        
         # Install dependencies
         print_status "Installing Node.js dependencies..."
         # Always use npm install to avoid lock file issues
@@ -224,55 +194,45 @@ CLONE_EOF
             print_warning "Please edit config.json with your Restorepoint details"
         fi
         
-        # Build Docker image
-        print_status "Building Docker image..."
-        docker build --no-cache -t rp-sl1-mcp .
+        # Install Node.js dependencies
+        print_status "Installing Node.js dependencies..."
+        npm install --production
         
-        # Stop and remove existing container if it exists
-        print_status "Cleaning up existing container..."
-        docker stop rp-sl1-mcp 2>/dev/null || true
-        docker rm rp-sl1-mcp 2>/dev/null || true
+        # Build the application
+        print_status "Building application..."
+        npm run build
         
-        # Start the service directly
+        # Start the MCP server as a background service
         print_status "Starting MCP server..."
-        docker run -d \
-            --name rp-sl1-mcp \
-            --restart unless-stopped \
-            -p 3000:3000 \
-            -e ENABLE_HTTP_SERVER=true \
-            -e NODE_ENV=production \
-            -v /opt/restorepoint/RP_SL1_MCP/config.json:/app/config.json:ro \
-            -v /opt/restorepoint/RP_SL1_MCP/logs:/app/logs \
-            rp-sl1-mcp
+        
+        # Kill any existing process
+        pkill -f "node.*server.js" 2>/dev/null || true
+        
+        # Start the server in background
+        ENABLE_HTTP_SERVER=true NODE_ENV=production nohup npm start > logs/mcp-server.log 2>&1 &
+        MCP_PID=$!
+        
+        # Save PID for service management
+        echo $MCP_PID > /var/run/mcp-server.pid
+        
+        print_status "✅ MCP Server started with PID: $MCP_PID"
         
         # Wait for startup
         sleep 15
         
-        # Check if container is running
-        print_status "Checking container status..."
-        if ! docker ps | grep rp-sl1-mcp; then
-            print_error "❌ Container is not running!"
-            print_error "Container logs:"
-            docker logs rp-sl1-mcp
-            exit 1
-        fi
-        
         # Health check
         print_status "Performing health check..."
-        sleep 15  # Give more time for application to start
         if curl -f http://localhost:3000/health 2>/dev/null; then
             print_status "✅ Health check passed!"
             print_status "✅ MCP Server is running successfully"
             
-            # Show logs
+            # Show recent logs
             print_status "Recent logs:"
-            docker logs --tail=10 rp-sl1-mcp
+            tail -n 20 logs/mcp-server.log
         else
             print_error "❌ Health check failed!"
-            print_error "Container logs:"
-            docker logs rp-sl1-mcp
-            print_error "Container status:"
-            docker ps -a | grep rp-sl1-mcp
+            print_error "Server logs:"
+            cat logs/mcp-server.log
             exit 1
         fi
         
@@ -281,20 +241,22 @@ CLONE_EOF
         sudo cat > /etc/systemd/system/restorepoint-mcp.service << 'SERVICE_EOF'
 [Unit]
 Description=Restorepoint MCP Server
-Requires=docker.service
-After=docker.service
+After=network.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=forking
 WorkingDirectory=/opt/restorepoint/RP_SL1_MCP
-ExecStart=/usr/bin/docker run -d --name rp-sl1-mcp --restart unless-stopped -p 3000:3000 -e ENABLE_HTTP_SERVER=true -e NODE_ENV=production -v /opt/restorepoint/RP_SL1_MCP/config.json:/app/config.json:ro -v /opt/restorepoint/RP_SL1_MCP/logs:/app/logs rp-sl1-mcp
-ExecStartPost=/usr/bin/sleep 5
-ExecStop=/usr/bin/docker stop rp-sl1-mcp
-ExecStopPost=/usr/bin/docker rm rp-sl1-mcp
-TimeoutStartSec=0
 User=ec2-user
 Group=ec2-user
+Environment=NODE_ENV=production
+Environment=ENABLE_HTTP_SERVER=true
+Environment=PATH=/opt/homebrew/opt/node@22/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=restorepoint-mcp
 
 [Install]
 WantedBy=multi-user.target

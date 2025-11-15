@@ -15,8 +15,8 @@ This project provides a world-class MCP server that enables natural language int
 
 ### **Key Features**
 - 🔧 **11+ Restorepoint Management Tools**: Device management, backup operations, command execution
-- 🐳 **Production-Ready Docker Deployment**: Multi-stage builds, health checks, monitoring
-- ☁️ **AWS Deployment Ready**: One-command deployment to EC2 (~$12-15/month)
+- ⚡ **Native Node.js Deployment**: Runs directly on OS for optimal performance
+- ☁️ **AWS EC2 Ready**: Simple deployment to EC2 (~$12-15/month)
 - 🧪 **Comprehensive Testing**: 41 passing tests with Jest framework
 - 📚 **Enterprise-Grade Architecture**: Professional standards, logging, error handling
 - 🤖 **AI Integration Ready**: Designed for z.ai, OpenAI, or other AI providers
@@ -36,10 +36,10 @@ cd RP_SL1_MCP
 ENABLE_HTTP_SERVER=true npm run dev
 ```
 
-### **AWS Deployment (30 seconds)**
+### **Production Deployment**
 ```bash
-# One-command deployment to AWS
-./deployment/scripts/deploy-aws.sh
+# Deploy to AWS EC2
+./deployment/scripts/deploy-manual-aws.sh --ip YOUR_EC2_IP --key YOUR_KEY.pem --repo https://github.com/youruser/RP_SL1_MCP.git
 ```
 
 ### **Test**
@@ -62,7 +62,7 @@ npm test
 ## 🛠️ **Technologies**
 
 - **Node.js 22+** with TypeScript
-- **Docker** containerization
+- **Native OS deployment** (no container overhead)
 - **AWS EC2** deployment ready
 - **@modelcontextprotocol/sdk** for MCP
 - **41 passing tests** with Jest
@@ -79,10 +79,10 @@ npm test
 ## 🎯 **Ready for Production**
 
 This MCP server is production-ready with:
-- ✅ Docker deployment infrastructure
+- ✅ Native Node.js deployment
 - ✅ AWS deployment automation  
 - ✅ Health check endpoints
 - ✅ Comprehensive testing
 - ✅ Professional documentation
 
-**Deploy to AWS in 30 seconds! 🚀**
+**Deploy to AWS in minutes! 🚀**
