@@ -759,10 +759,41 @@ async function main(): Promise<void> {
 // Start the server if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    Logger.logWithContext('error', 'Failed to start MCP Server', 'MCPServer', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      type: error instanceof Error ? error.constructor.name : typeof error,
-    });
+    // Initialize Logger before usage - provide fallback config if needed
+    try {
+      Logger.initialize({
+        restorepoint: { 
+          serverUrl: 'unknown', 
+          apiVersion: 'v1',
+          token: 'fallback',
+          timeout: 30000,
+          retryAttempts: 3,
+          retryDelay: 1000
+        },
+        mcp: { 
+          serverName: 'fallback-server',
+          version: '1.0.0',
+          logLevel: 'error',
+          maxConcurrentTasks: 1
+        },
+        async: { 
+          maxConcurrentTasks: 1,
+          taskTimeout: 60000,
+          cleanupInterval: 30000
+        }
+      });
+      Logger.logWithContext('error', 'Failed to start MCP Server', 'MCPServer', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : typeof error,
+      });
+    } catch (loggerError) {
+      // Fallback to console if Logger initialization fails
+      console.error('Failed to start MCP Server:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        loggerError: loggerError instanceof Error ? loggerError.message : 'Unknown logger error'
+      });
+    }
     process.exit(1);
   });
 }
