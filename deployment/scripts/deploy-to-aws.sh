@@ -2,10 +2,9 @@
 set -e
 
 # =============================================================================
-# Fixed Manual AWS Instance Deployment Script
+# AWS Deployment Script
 # =============================================================================
-# Use this script if you've already created an EC2 instance manually
-# Fixes Logger initialization issue by adding fallback error handling
+# Deploy MCP server to AWS EC2 instance (native Node.js, no Docker)
 # =============================================================================
 
 # Configuration
@@ -269,7 +268,7 @@ CLONE_EOF
         
         # Create systemd service for auto-start
         print_status "Creating systemd service..."
-        sudo cat > /etc/systemd/system/restorepoint-mcp.service << 'SERVICE_EOF'
+        sudo bash -c 'cat > /etc/systemd/system/restorepoint-mcp.service << "SERVICE_EOF"'
 [Unit]
 Description=Restorepoint MCP Server
 After=network.target
@@ -285,8 +284,8 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/node dist/server.js
 Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=restorepoint-mcp
 PIDFile=/opt/restorepoint/RP_SL1_MCP/mcp-server.pid
 
@@ -297,7 +296,25 @@ SERVICE_EOF
         sudo systemctl daemon-reload
         sudo systemctl enable restorepoint-mcp.service
         
-        print_status "✅ Systemd service created and enabled"
+        # Stop background process and start via systemd
+        print_status "Stopping background process and starting via systemd..."
+        pkill -f "node.*dist/server.js" 2>/dev/null || true
+        sleep 2
+        sudo systemctl start restorepoint-mcp.service
+        
+        # Wait for systemd service to start
+        sleep 5
+        
+        # Verify systemd service is running
+        if sudo systemctl is-active --quiet restorepoint-mcp.service; then
+            print_status "✅ Systemd service is running successfully"
+        else
+            print_error "❌ Systemd service failed to start"
+            sudo systemctl status restorepoint-mcp.service
+            exit 1
+        fi
+        
+        print_status "✅ Systemd service created, enabled, and running"
 DEPLOY_EOF
     
     if [ $? -eq 0 ]; then
@@ -392,8 +409,8 @@ done
 
 # Main execution
 main() {
-    print_header "FIXED MANUAL AWS INSTANCE DEPLOYMENT"
-    print_status "Deploying MCP server to your manually created EC2 instance with Logger initialization fix"
+    print_header "AWS DEPLOYMENT"
+    print_status "Deploying MCP server to AWS EC2 instance (native Node.js)"
     echo ""
     
     get_ec2_ip

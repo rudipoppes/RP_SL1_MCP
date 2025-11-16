@@ -201,19 +201,18 @@ curl -H "Authorization: Bearer YOUR_TOKEN" https://your-restorepoint-server.com/
 
 ## Production Deployment
 
-### Docker Deployment
+### AWS EC2 Native Deployment
 ```bash
-# Build Docker image
-docker build -t rp-sl1-mcp .
+# Deploy to AWS EC2 instance
+./deployment/scripts/deploy-to-aws.sh --ip YOUR_EC2_IP --key YOUR_KEY.pem
 
-# Run container
-docker run -d --name rp-sl1-mcp \
-  -v $(pwd)/config.json:/app/config.json:ro \
-  -v $(pwd)/logs:/app/logs \
-  rp-sl1-mcp
+# Or manual deployment:
+# 1. Clone repo to EC2
+# 2. npm install && npm run build
+# 3. ENABLE_HTTP_SERVER=true NODE_ENV=production node dist/server.js
 ```
 
-### PM2 Process Manager
+### PM2 Process Manager (Alternative)
 ```bash
 npm install -g pm2
 pm2 start ecosystem.config.js
@@ -222,7 +221,7 @@ pm2 start ecosystem.config.js
 ### Monitoring
 - Logs: `tail -f logs/*.log`
 - Process: `pm2 monit`
-- Resources: `docker stats rp-sl1-mcp`
+- Health Check: `curl http://localhost:3000/health`
 
 ## API Reference
 

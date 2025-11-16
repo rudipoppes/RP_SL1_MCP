@@ -1,11 +1,10 @@
 # 🚀 RP_SL1_MCP - Restorepoint MCP Server
 
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Professional MCP (Model Context Protocol) server for Restorepoint API integration with complete Docker deployment infrastructure.**
+**Professional MCP (Model Context Protocol) server for Restorepoint API integration with native Node.js deployment.**
 
 ---
 
@@ -39,7 +38,7 @@ ENABLE_HTTP_SERVER=true npm run dev
 ### **Production Deployment**
 ```bash
 # Deploy to AWS EC2
-./deployment/scripts/deploy-manual-aws.sh --ip YOUR_EC2_IP --key YOUR_KEY.pem --repo https://github.com/youruser/RP_SL1_MCP.git
+./deployment/scripts/deploy-to-aws.sh --ip YOUR_EC2_IP --key YOUR_KEY.pem --repo https://github.com/youruser/RP_SL1_MCP.git
 ```
 
 ### **Test**
@@ -53,7 +52,6 @@ npm test
 ## 📚 **Complete Documentation**
 
 - 📖 **[Architecture Plan](./RESTOREPOINT_CHAT_ARCHITECTURE.md)** - Complete chat interface design
-- 📖 **[Docker Guide](./DOCKER_DEPLOYMENT_GUIDE.md)** - Step-by-step deployment guide
 - 📖 **[Next Steps](./NEXT_STEPS.md)** - Decision points and roadmap
 - 📖 **[Setup Guide](./docs/SETUP.md)** - Local development setup
 
@@ -79,10 +77,11 @@ npm test
 ## 🎯 **Ready for Production**
 
 This MCP server is production-ready with:
-- ✅ Native Node.js deployment
-- ✅ AWS deployment automation  
+- ✅ Native Node.js deployment (no Docker)
+- ✅ AWS deployment automation with systemd service
+- ✅ Logger initialization fixes
 - ✅ Health check endpoints
-- ✅ Comprehensive testing
+- ✅ Comprehensive testing (41 passing tests)
 - ✅ Professional documentation
 
 **Deploy to AWS in minutes! 🚀**
