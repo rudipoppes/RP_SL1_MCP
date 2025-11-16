@@ -749,6 +749,11 @@ async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> 
  * Main entry point
  */
 async function main(): Promise<void> {
+  // Load configuration and initialize Logger first
+  const config = await configManager.loadConfig();
+  Logger.initialize(config);
+  Logger.logWithContext('info', 'Starting MCP Server', 'MCPServer');
+  
   const server = new RestorepointMCPServer();
   await server.start();
   
