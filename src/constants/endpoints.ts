@@ -15,6 +15,7 @@ export const RESTOREPOINT_ENDPOINTS = {
   BACKUP_BY_ID: (id: string): string => `/backups/${id}`,
   BACKUP_EXECUTE: '/backups/execute',
   BACKUP_STATUS: (taskId: string): string => `/backups/status/${taskId}`,
+  DEVICE_BACKUPS_PERFORM: '/devices/backups',
   
   // Restore Operations
   RESTORES: '/restores',
@@ -29,6 +30,8 @@ export const RESTOREPOINT_ENDPOINTS = {
   COMMAND_STATUS: (taskId: string): string => `/commands/status/${taskId}`,
   COMMAND_SCHEDULE: '/commands/schedule',
   COMMAND_OUTPUT: (taskId: string): string => `/commands/output/${taskId}`,
+  COMMANDS_PERFORM: '/commands/perform',
+  TASK_STATUS: (taskId: string): string => `/tasks/${taskId}`,
   
   // Agent Management
   AGENTS: '/agents',

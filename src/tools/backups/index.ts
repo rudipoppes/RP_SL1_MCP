@@ -20,7 +20,7 @@ export const handleListBackups = async (args: unknown, apiClient: ApiClient): Pr
     const { 
       limit = 50, 
       offset = 0, 
-      sortBy = 'createdAt', 
+      sortBy = 'Created', 
       sortOrder = 'desc',
       deviceId,
       dateFrom,
@@ -243,6 +243,107 @@ export const handleGetBackup = async (args: unknown, apiClient: ApiClient): Prom
       error: {
         code: ERROR_CODES.NETWORK_CONNECTION_FAILED,
         message: `Failed to retrieve backup details: ${errorMessage}`,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+};
+
+/**
+ * Handle create_backup tool with real API integration
+ */
+export const handleCreateBackup = async (args: unknown, apiClient: ApiClient): Promise<McpResult> => {
+  const timer = Logger.startTimer('BackupTools', 'createBackup');
+  
+  try {
+    const { deviceId, deviceIds, backupType = 'automatic' } = args as { 
+      deviceId?: string | number;
+      deviceIds?: (string | number)[];
+      backupType?: string;
+    };
+
+    // Input validation
+    const devicesToBackup = deviceIds || (deviceId ? [deviceId] : []);
+    
+    if (devicesToBackup.length === 0) {
+      return {
+        success: false,
+        error: {
+          code: ERROR_CODES.VALIDATION_MISSING_FIELD,
+          message: 'Device ID or Device IDs are required to create backup',
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+
+    Logger.logWithContext('info', 'Creating backup via Restorepoint API', 'BackupTools', {
+      deviceIds: devicesToBackup,
+      backupType
+    });
+
+    // Build request payload
+    const payload: any = {
+      backupType,
+      deviceIds: devicesToBackup.map(id => typeof id === 'string' ? parseInt(id, 10) : id)
+    };
+
+    // Make API request to create backup
+    const response = await apiClient.post<any>(
+      RESTOREPOINT_ENDPOINTS.DEVICE_BACKUPS_PERFORM,
+      payload
+    );
+
+    if (!response.success) {
+      throw new RestorepointError(
+        ERROR_CODES.BACKUP_FAILED,
+        response.message || 'Failed to create backup on Restorepoint',
+        response.errors ? Object.keys(response.errors).length : 0
+      );
+    }
+
+    const backupTask = response.data;
+
+    timer();
+
+    Logger.logWithContext('info', 'Backup creation initiated successfully', 'BackupTools', {
+      taskId: backupTask?.id || backupTask?.taskId,
+      deviceIds: devicesToBackup,
+      backupType
+    });
+
+    return {
+      success: true,
+      data: backupTask,
+      message: `Successfully initiated backup for ${devicesToBackup.length} device(s)`,
+    };
+
+  } catch (error) {
+    timer();
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    Logger.logWithContext('error', 'Failed to create backup via API', 'BackupTools', {
+      error: errorMessage,
+      errorType: error instanceof RestorepointError ? 'RestorepointError' : 'Unknown',
+    });
+
+    if (error instanceof RestorepointError) {
+      return {
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          timestamp: error.timestamp.toISOString(),
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: {
+        code: ERROR_CODES.BACKUP_FAILED,
+        message: `Failed to create backup: ${errorMessage}`,
         timestamp: new Date().toISOString(),
       },
     };

@@ -13,9 +13,10 @@ import { configManager } from './config/index.js';
 import { ApiClient } from './auth/api-client.js';
 import { Logger } from './utils/logger.js';
 import { handleListDevices, handleGetDevice } from './tools/devices/list-get.js';
+import { handleGetStatus } from './tools/devices/status.js';
 import { handleCreateDevice, handleUpdateDevice, handleDeleteDevice } from './tools/devices/crud.js';
-import { handleListBackups, handleGetBackup } from './tools/backups/index.js';
-import { handleListCommands, handleGetCommand } from './tools/commands/index.js';
+import { handleListBackups, handleGetBackup, handleCreateBackup } from './tools/backups/index.js';
+import { handleListCommands, handleGetCommand, handleExecuteCommand, handleGetTaskStatus } from './tools/commands/index.js';
 import type { McpResult } from './types/mcp-tools.js';
 
 // Simple interfaces for now
@@ -105,6 +106,7 @@ class RestorepointHttpServer {
       const tools = [
         { name: 'list_devices', description: 'List all network devices' },
         { name: 'get_device', description: 'Get details of a specific device' },
+        { name: 'get_status', description: 'Get device status information' },
         { name: 'create_device', description: 'Add a new device' },
         { name: 'update_device', description: 'Update device configuration' },
         { name: 'delete_device', description: 'Remove a device' },
@@ -140,7 +142,7 @@ class RestorepointHttpServer {
         success: true,
         data: {
           message: 'Use POST /tools/execute to execute tools',
-          availableTools: ['list_devices', 'get_device', 'create_device', 'update_device', 'delete_device', 'list_backups', 'get_backup', 'create_backup', 'list_commands', 'get_command', 'execute_command', 'get_task_status']
+          availableTools: ['list_devices', 'get_device', 'get_status', 'create_device', 'update_device', 'delete_device', 'list_backups', 'get_backup', 'create_backup', 'list_commands', 'get_command', 'execute_command', 'get_task_status']
         },
         timestamp: new Date().toISOString()
       });
@@ -185,6 +187,9 @@ class RestorepointHttpServer {
           case 'get_device':
             result = await handleGetDevice(args, this.apiClient);
             break;
+          case 'get_status':
+            result = await handleGetStatus(args, this.apiClient);
+            break;
           case 'create_device':
             result = await handleCreateDevice(args, this.apiClient);
             break;
@@ -205,6 +210,15 @@ class RestorepointHttpServer {
             break;
           case 'get_command':
             result = await handleGetCommand(args, this.apiClient);
+            break;
+          case 'create_backup':
+            result = await handleCreateBackup(args, this.apiClient);
+            break;
+          case 'execute_command':
+            result = await handleExecuteCommand(args, this.apiClient);
+            break;
+          case 'get_task_status':
+            result = await handleGetTaskStatus(args, this.apiClient);
             break;
           default:
             throw new Error(`Tool not found: ${tool}`);
