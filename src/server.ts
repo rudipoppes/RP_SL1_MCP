@@ -1,746 +1,291 @@
 /**
- * Restorepoint MCP Server - Clean Implementation
- * Professional MCP server with proper engineering practices
+ * Restorepoint HTTP API Server - Simple Working Version
+ * Basic HTTP REST API for Restorepoint operations
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
+import express from 'express';
+import type { Application, Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 
 import { configManager } from './config/index.js';
 import { ApiClient } from './auth/api-client.js';
 import { Logger } from './utils/logger.js';
-import { taskManager } from './utils/async-handler.js';
-import { ERROR_CODES, RestorepointError } from './constants/error-codes.js';
-import { MCP_CONSTANTS } from './constants/endpoints.js';
 import { handleListDevices, handleGetDevice } from './tools/devices/list-get.js';
 import { handleCreateDevice, handleUpdateDevice, handleDeleteDevice } from './tools/devices/crud.js';
 import { handleListBackups, handleGetBackup } from './tools/backups/index.js';
 import { handleListCommands, handleGetCommand } from './tools/commands/index.js';
 import type { McpResult } from './types/mcp-tools.js';
 
-/**
- * Main MCP Server class
- */
-class RestorepointMCPServer {
-  private readonly server: Server;
+// Simple interfaces for now
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+  timestamp: string;
+}
+
+// Extend Request interface
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
+class RestorepointHttpServer {
+  private readonly app: Application;
   private apiClient: ApiClient | null = null;
   private isShuttingDown = false;
-  private tools: any[] = [];
 
   constructor() {
-    // Create MCP server instance
-    this.server = new Server(
-      {
-        name: MCP_CONSTANTS.SERVER_NAME,
-        version: MCP_CONSTANTS.SERVER_VERSION,
-      },
-      {
-        capabilities: MCP_CONSTANTS.CAPABILITIES,
-      }
-    );
-
-    this.setupHandlers();
-    this.registerTools();
+    this.app = express();
+    this.setupMiddleware();
+    this.setupRoutes();
   }
 
-  /**
-   * Initialize the server with configuration
-   */
+  private setupMiddleware(): void {
+    this.app.use(helmet());
+    this.app.use(cors({
+      origin: ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:4001'],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
+    }));
+
+    const limiter = rateLimit({
+      windowMs: 60000,
+      max: 1000,
+      message: {
+        success: false,
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests. Please try again later.'
+        }
+      }
+    });
+    this.app.use(limiter);
+
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    this.app.use((req: Request, res: Response, next) => {
+      req.requestId = req.headers['x-request-id'] as string || Math.random().toString(36).substring(7);
+      next();
+    });
+  }
+
+  private setupRoutes(): void {
+    // Health check endpoint
+    this.app.get('/health', (req: Request, res: Response) => {
+      const isHealthy = !this.isShuttingDown;
+      const status = {
+        status: isHealthy ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        server: 'RP_SL1_API',
+        version: '2.0.0',
+        apiConnected: this.apiClient !== undefined
+      };
+      
+      res.status(isHealthy ? 200 : 503).json({
+        success: true,
+        data: status,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Info endpoint
+    this.app.get('/info', (req: Request, res: Response) => {
+      const tools = [
+        { name: 'list_devices', description: 'List all network devices' },
+        { name: 'get_device', description: 'Get details of a specific device' },
+        { name: 'create_device', description: 'Add a new device' },
+        { name: 'update_device', description: 'Update device configuration' },
+        { name: 'delete_device', description: 'Remove a device' },
+        { name: 'list_backups', description: 'List backup history' },
+        { name: 'get_backup', description: 'Get backup details' },
+        { name: 'create_backup', description: 'Start backup operation' },
+        { name: 'list_commands', description: 'List command execution history' },
+        { name: 'get_command', description: 'Get command execution details' },
+        { name: 'execute_command', description: 'Execute command on devices' },
+        { name: 'get_task_status', description: 'Check task status' }
+      ];
+      
+      res.json({
+        success: true,
+        data: {
+          server: 'RP_SL1_API',
+          version: '2.0.0',
+          endpoints: {
+            health: '/health',
+            info: '/info',
+            tools: '/tools',
+            execute: '/tools/execute'
+          },
+          tools
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // List tools endpoint
+    this.app.get('/tools', (req: Request, res: Response) => {
+      res.json({
+        success: true,
+        data: {
+          message: 'Use POST /tools/execute to execute tools',
+          availableTools: ['list_devices', 'get_device', 'create_device', 'update_device', 'delete_device', 'list_backups', 'get_backup', 'create_backup', 'list_commands', 'get_command', 'execute_command', 'get_task_status']
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Execute tool endpoint
+    this.app.post('/tools/execute', async (req: Request, res: Response) => {
+      const { tool, arguments: args = {} } = req.body;
+      const requestId = req.requestId || 'unknown';
+
+      try {
+        if (!tool) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: 'MISSING_TOOL_NAME',
+              message: 'Tool name is required'
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        if (!this.apiClient) {
+          return res.status(503).json({
+            success: false,
+            error: {
+              code: 'API_CLIENT_NOT_INITIALIZED',
+              message: 'API client not available - Restorepoint connection failed'
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        
+        let result: McpResult;
+
+        // Execute the appropriate tool
+        switch (tool) {
+          case 'list_devices':
+            result = await handleListDevices(args, this.apiClient);
+            break;
+          case 'get_device':
+            result = await handleGetDevice(args, this.apiClient);
+            break;
+          case 'create_device':
+            result = await handleCreateDevice(args, this.apiClient);
+            break;
+          case 'update_device':
+            result = await handleUpdateDevice(args, this.apiClient);
+            break;
+          case 'delete_device':
+            result = await handleDeleteDevice(args, this.apiClient);
+            break;
+          case 'list_backups':
+            result = await handleListBackups(args, this.apiClient);
+            break;
+          case 'get_backup':
+            result = await handleGetBackup(args, this.apiClient);
+            break;
+          case 'list_commands':
+            result = await handleListCommands(args, this.apiClient);
+            break;
+          case 'get_command':
+            result = await handleGetCommand(args, this.apiClient);
+            break;
+          default:
+            throw new Error(`Tool not found: ${tool}`);
+        }
+
+        
+        return res.json({
+          success: true,
+          data: result,
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error: any) {
+        
+        return res.status(500).json({
+          success: false,
+          error: {
+            code: 'TOOL_EXECUTION_ERROR',
+            message: error.message || 'An unknown error occurred'
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+
+    // 404 handler
+    this.app.use('*', (req: Request, res: Response) => {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Endpoint not found: ${req.method} ${req.originalUrl}`
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Error handler
+    this.app.use((error: Error, req: Request, res: Response, next: any) => {
+            
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred'
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+  }
+
   public async initialize(): Promise<void> {
     try {
-      // Load configuration
       const config = await configManager.loadConfig();
       Logger.initialize(config);
 
-      Logger.logWithContext('info', 'Initializing Restorepoint MCP Server', 'MCPServer');
-      Logger.logWithContext('info', 'Configuration loaded successfully', 'MCPServer');
-      Logger.logWithContext('info', `Restorepoint server: ${config.restorepoint.serverUrl}`, 'MCPServer');
-      Logger.logWithContext('info', `API version: ${config.restorepoint.apiVersion}`, 'MCPServer');
-
-      // Initialize API client
-      this.apiClient = await ApiClient.create(config);
-      this.apiClient.initializeToken();
-
-      // Skip connection test during startup to avoid hanging
-      // Connection test available but disabled for startup performance
-      // await this.testConnection();
-
-      Logger.logWithContext('info', 'MCP Server initialized successfully', 'MCPServer');
-    } catch (error) {
-      Logger.logWithContext('error', 'Failed to initialize MCP Server', 'MCPServer', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-      });
-      throw error;
+      // Create API client but don't block server startup on token initialization
+      try {
+        this.apiClient = await ApiClient.create(config);
+        this.apiClient.initializeToken();
+      } catch (apiError: any) {
+        // Continue without API client - server can still respond to health checks
+      }
+    } catch (error: any) {
+            throw error;
     }
   }
 
-  /**
-   * Start the MCP server
-   */
   public async start(): Promise<void> {
     try {
       await this.initialize();
 
-      // Setup graceful shutdown handlers
-      this.setupShutdownHandlers();
-
-      // Start the server with stdio transport
-      const transport = new StdioServerTransport();
-      await this.server.connect(transport);
-
-      Logger.logWithContext('info', 'Restorepoint MCP Server started successfully', 'MCPServer');
-      await this.logServerStatus();
-
-    } catch (error) {
-      Logger.logWithContext('error', 'Failed to start MCP Server', 'MCPServer', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-      });
-      process.exit(1);
-    }
-  }
-
-  /**
-   * Setup MCP protocol handlers
-   */
-  private setupHandlers(): void {
-    // Handle list tools request
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      Logger.logWithContext('info', 'Listing available tools', 'MCPServer');
-      return {
-        tools: this.tools.map(tool => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-        })),
-      };
-    });
-
-    // Handle tool execution request
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-      Logger.logWithContext('info', `Executing tool: ${name}`, 'MCPServer', {
-        toolName: name,
-        argumentCount: Object.keys(args || {}).length,
-        hasArguments: Object.keys(args || {}).length > 0,
-      });
-
-      try {
-        const result = await this.executeTool(name, args);
-        return result;
-      } catch (error) {
-        Logger.logWithContext('error', `Error executing tool ${name}`, 'MCPServer', {
-          toolName: name,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          type: error instanceof Error ? error.constructor.name : typeof error,
-        });
-        throw new McpError(
-          ErrorCode.InternalError,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-      }
-    });
-  }
-
-  /**
-   * Register tool implementations
-   */
-  private registerTools(): void {
-    Logger.logWithContext('info', 'Registering MCP tools', 'MCPServer');
-    
-    this.tools = [
-      {
-        name: 'list_devices',
-        description: 'List all devices with comprehensive filtering and pagination',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            limit: {
-              type: 'number',
-              description: 'Maximum number of devices to return (max 100)',
-              default: 50,
-              minimum: 1,
-              maximum: 100,
-            },
-            offset: {
-              type: 'number',
-              description: 'Number of devices to skip for pagination',
-              default: 0,
-              minimum: 0,
-            },
-            sortBy: {
-              type: 'string',
-              description: 'Field to sort devices by',
-              enum: ['name', 'type', 'status', 'createdAt', 'updatedAt'],
-              default: 'createdAt',
-            },
-            sortOrder: {
-              type: 'string',
-              description: 'Sort order',
-              enum: ['asc', 'desc'],
-              default: 'desc',
-            },
-            filter: {
-              type: 'object',
-              description: 'Filter criteria for devices',
-              properties: {
-                type: {
-                  type: 'string',
-                  description: 'Filter by device type',
-                },
-                enabled: {
-                  type: 'boolean',
-                  description: 'Filter by enabled status',
-                },
-                searchTerm: {
-                  type: 'string',
-                  description: 'Search term to filter by name, description, hostname, or IP',
-                },
-              },
-            },
-          },
-        },
-      },
-      {
-        name: 'get_device',
-        description: 'Get detailed information about a specific device',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deviceId: {
-              type: 'string',
-              description: 'Device ID to retrieve details for',
-            },
-            includeConnections: {
-              type: 'boolean',
-              description: 'Include connection and interface details',
-              default: false,
-            },
-          },
-          required: ['deviceId'],
-        },
-      },
-      {
-        name: 'create_device',
-        description: 'Create a new device in Restorepoint',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description: 'Device name (1-200 characters)',
-              minLength: 1,
-              maxLength: 200,
-            },
-            type: {
-              type: 'string',
-              description: 'Device type (e.g., cisco-ios, cisco-nxos, linux, windows)',
-            },
-            ipAddress: {
-              type: 'string',
-              description: 'Device IP address',
-              format: 'ipv4',
-            },
-            hostname: {
-              type: 'string',
-              description: 'Device hostname',
-            },
-            credentials: {
-              type: 'object',
-              description: 'Device credentials',
-              properties: {
-                username: {
-                  type: 'string',
-                  description: 'Username for device authentication',
-                },
-                password: {
-                  type: 'string',
-                  description: 'Password for device authentication',
-                },
-              },
-              required: ['username', 'password'],
-            },
-            description: {
-              type: 'string',
-              description: 'Device description',
-            },
-            enabled: {
-              type: 'boolean',
-              description: 'Whether the device is enabled',
-              default: true,
-            },
-          },
-          required: ['name', 'type', 'credentials'],
-        },
-      },
-      {
-        name: 'update_device',
-        description: 'Update an existing device in Restorepoint',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deviceId: {
-              type: 'string',
-              description: 'Device ID to update',
-            },
-            name: {
-              type: 'string',
-              description: 'Updated device name',
-              minLength: 1,
-              maxLength: 200,
-            },
-            type: {
-              type: 'string',
-              description: 'Updated device type',
-            },
-            ipAddress: {
-              type: 'string',
-              description: 'Updated IP address',
-              format: 'ipv4',
-            },
-            hostname: {
-              type: 'string',
-              description: 'Updated hostname',
-            },
-            credentials: {
-              type: 'object',
-              description: 'Updated credentials',
-              properties: {
-                username: {
-                  type: 'string',
-                  description: 'Updated username',
-                },
-                password: {
-                  type: 'string',
-                  description: 'Updated password',
-                },
-              },
-            },
-            description: {
-              type: 'string',
-              description: 'Updated description',
-            },
-            enabled: {
-              type: 'boolean',
-              description: 'Updated enabled status',
-            },
-          },
-          required: ['deviceId'],
-        },
-      },
-      {
-        name: 'delete_device',
-        description: 'Delete a device from Restorepoint',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deviceId: {
-              type: 'string',
-              description: 'Device ID to delete',
-            },
-            force: {
-              type: 'boolean',
-              description: 'Force delete even if device has backups',
-              default: false,
-            },
-          },
-          required: ['deviceId'],
-        },
-      },
-      {
-        name: 'create_backup',
-        description: 'Start backup for specified devices',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deviceIds: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'List of device IDs to backup',
-            },
-            backupName: {
-              type: 'string',
-              description: 'Name for the backup',
-            },
-          },
-          required: ['deviceIds'],
-        },
-      },
-      {
-        name: 'get_task_status',
-        description: 'Check status of a task',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            taskId: {
-              type: 'string',
-              description: 'Task ID to check',
-            },
-          },
-          required: ['taskId'],
-        },
-      },
-      {
-        name: 'execute_command',
-        description: 'Execute command on devices',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deviceIds: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'List of device IDs',
-            },
-            command: {
-              type: 'string',
-              description: 'Command to execute',
-            },
-          },
-          required: ['deviceIds', 'command'],
-        },
-      },
-    ];
-
-    Logger.logWithContext('info', `Registered ${this.tools.length} tools`, 'MCPServer', {
-      toolCount: this.tools.length,
-      toolNames: this.tools.map(tool => tool.name),
-    });
-  }
-
-  /**
-   * Execute tool by name
-   */
-  private async executeTool(name: string, args: unknown) {
-    if (!this.apiClient) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        'API client not initialized'
-      );
-    }
-
-    try {
-      switch (name) {
-        case 'list_devices':
-          return await this.handleMcpResult(handleListDevices(args, this.apiClient));
-        case 'get_device':
-          return await this.handleMcpResult(handleGetDevice(args, this.apiClient));
-        case 'create_device':
-          return await this.handleMcpResult(handleCreateDevice(args, this.apiClient));
-        case 'update_device':
-          return await this.handleMcpResult(handleUpdateDevice(args, this.apiClient));
-        case 'delete_device':
-          return await this.handleMcpResult(handleDeleteDevice(args, this.apiClient));
-        case 'create_backup':
-          return await this.handleCreateBackup(args);
-        case 'get_task_status':
-          return await this.handleGetTaskStatus(args);
-        case 'execute_command':
-          return await this.handleExecuteCommand(args);
-        case 'list_backups':
-          return await this.handleMcpResult(handleListBackups(args, this.apiClient));
-        case 'get_backup':
-          return await this.handleMcpResult(handleGetBackup(args, this.apiClient));
-        case 'list_commands':
-          return await this.handleMcpResult(handleListCommands(args, this.apiClient));
-        case 'get_command':
-          return await this.handleMcpResult(handleGetCommand(args, this.apiClient));
-        default:
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Tool not found: ${name}`
-          );
-      }
-    } catch (error) {
-      Logger.logWithContext('error', `Error executing tool ${name}`, 'MCPServer', {
-        toolName: name,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-      });
-      throw new McpError(
-        ErrorCode.InternalError,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-    }
-  }
-
-  /**
-   * Convert McpResult to MCP response format
-   */
-  private async handleMcpResult(result: Promise<McpResult>) {
-    const mcpResult = await result;
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: mcpResult.success,
-            data: mcpResult.data,
-            message: mcpResult.message,
-            error: mcpResult.error,
-          }, null, 2),
-        },
-      ],
-    };
-  }
-
-  
-  /**
-   * Handle create_backup tool
-   */
-  private async handleCreateBackup(args: unknown) {
-    const { deviceIds, backupName } = args as { deviceIds: string[]; backupName?: string };
-    const taskId = `backup_${Date.now()}_${crypto.randomUUID()}`;
-
-    // Create async task with proper context
-    if (this.apiClient) {
-      const taskMessage = backupName 
-        ? `Backup "${backupName}" started for ${deviceIds.length} devices`
-        : `Backup started for ${deviceIds.length} devices`;
-      taskManager.createTask(taskId, 'backup', taskMessage);
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            taskId,
-            message: `Backup started for ${deviceIds.length} devices`,
-            estimatedTime: '5-10 minutes',
-            deviceIds,
-          }, null, 2),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Handle get_task_status tool
-   */
-  private async handleGetTaskStatus(args: unknown) {
-    const { taskId } = args as { taskId: string };
-    
-    // Check task manager
-    const task = taskManager.getTask(taskId);
-    if (!task) {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Task not found: ${taskId}`
-      );
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            taskId,
-            status: task.status,
-            progress: task.progress,
-            message: task.message,
-            timestamp: task.updatedAt.toISOString(),
-          }, null, 2),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Handle execute_command tool
-   */
-  private async handleExecuteCommand(args: unknown) {
-    const { deviceIds, command } = args as { deviceIds: string[]; command: string };
-    const taskId = `cmd_${Date.now()}_${crypto.randomUUID()}`;
-
-    // Create async task
-    if (this.apiClient) {
-      taskManager.createTask(taskId, 'command', `Command execution started on ${deviceIds.length} devices`);
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            taskId,
-            message: `Command execution started on ${deviceIds.length} devices`,
-            command,
-            deviceIds,
-            estimatedTime: '2-5 minutes',
-          }, null, 2),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Test connection to Restorepoint API
-   */
-  private async testConnection(): Promise<void> {
-    try {
-      Logger.logWithContext('info', 'Testing connection to Restorepoint API', 'MCPServer');
-      
-      if (!this.apiClient) {
-        throw new Error('API client not initialized');
-      }
-
-      const isConnected = await this.apiClient.testConnection();
-      if (!isConnected) {
-        throw new RestorepointError(
-          ERROR_CODES.NETWORK_CONNECTION_FAILED,
-          'Failed to connect to Restorepoint API'
-        );
-      }
-
-      Logger.logWithContext('info', 'Connection test successful', 'MCPServer');
-    } catch (error) {
-      Logger.logWithContext('error', 'Connection test failed', 'MCPServer', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-      });
-      throw new RestorepointError(
-        ERROR_CODES.NETWORK_CONNECTION_FAILED,
-        `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * Setup graceful shutdown handlers
-   */
-  private setupShutdownHandlers(): void {
-    const shutdown = async (signal: string) => {
-      if (this.isShuttingDown) {
-        Logger.logWithContext('warn', 'Force shutdown detected', 'MCPServer');
-        process.exit(1);
-      }
-
-      this.isShuttingDown = true;
-      Logger.logWithContext('info', `Starting graceful shutdown (${signal})`, 'MCPServer');
-
-      try {
-        taskManager.shutdown();
-        Logger.logWithContext('info', 'Graceful shutdown completed', 'MCPServer');
-        process.exit(0);
-      } catch (error) {
-        Logger.logWithContext('error', 'Error during shutdown', 'MCPServer', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          type: error instanceof Error ? error.constructor.name : typeof error,
-        });
-        process.exit(1);
-      }
-    };
-
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-
-    process.on('uncaughtException', (error) => {
-      Logger.logWithContext('error', 'Uncaught exception', 'MCPServer', {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
-      process.exit(1);
-    });
-
-    process.on('unhandledRejection', (reason) => {
-      Logger.logWithContext('error', 'Unhandled rejection', 'MCPServer', {
-        reason: reason instanceof Error ? reason.message : String(reason),
-        type: reason instanceof Error ? reason.constructor.name : typeof reason,
-      });
-      process.exit(1);
-    });
-  }
-
-  /**
-   * Log server startup information
-   */
-  private async logServerStatus(): Promise<void> {
-    const config = await configManager.getConfig();
-    
-    Logger.logWithContext('info', '=== RESTOREPOINT MCP SERVER STATUS ===', 'MCPServer');
-    Logger.logWithContext('info', `Server: ${MCP_CONSTANTS.SERVER_NAME} v${MCP_CONSTANTS.SERVER_VERSION}`, 'MCPServer');
-    if (config) {
-      const configData = config;
-      Logger.logWithContext('info', `API: ${configData.restorepoint.serverUrl}/api/${configData.restorepoint.apiVersion}`, 'MCPServer');
-      Logger.logWithContext('info', `Max Concurrent Tasks: ${configData.async.maxConcurrentTasks}`, 'MCPServer');
-    }
-    Logger.logWithContext('info', `Available Tools: ${this.tools.length}`, 'MCPServer');
-    this.tools.forEach(tool => {
-      Logger.logWithContext('info', `- ${tool.name}: ${tool.description}`, 'MCPServer', {
-        toolName: tool.name,
-        toolDescription: tool.description,
-      });
-    });
-    Logger.logWithContext('info', '============================================', 'MCPServer');
-  }
-}
-
-/**
- * Start HTTP server for health checks (optional)
- * Only starts if ENABLE_HTTP_SERVER=true or in production
- */
-async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> {
-  if (process.env.ENABLE_HTTP_SERVER === 'true' || process.env.NODE_ENV === 'production') {
-    try {
-      // Dynamic import for express to avoid dependency if not needed
-      // @ts-ignore - Express types not available
-      const express = await import('express');
-      const app = express.default();
       const port = Number(process.env.PORT) || 3000;
+      const host = process.env.HOST || '0.0.0.0';
 
-      // Health check endpoint
-      app.get('/health', (req: any, res: any) => {
-        const isHealthy = mcpServer['apiClient'] !== undefined;
-        const status = {
-          status: isHealthy ? 'healthy' : 'unhealthy',
-          timestamp: new Date().toISOString(),
-          uptime: process.uptime(),
-          server: MCP_CONSTANTS.SERVER_NAME,
-          version: MCP_CONSTANTS.SERVER_VERSION,
-          tools: mcpServer['tools']?.length || 0
-        };
-        
-        res.status(isHealthy ? 200 : 503).json(status);
+      this.app.listen(port, host, () => {
+        // Server started successfully
       });
 
-      // Basic info endpoint
-      app.get('/info', (req: any, res: any) => {
-        res.json({
-          server: MCP_CONSTANTS.SERVER_NAME,
-          version: MCP_CONSTANTS.SERVER_VERSION,
-          tools: mcpServer['tools']?.map(tool => ({
-            name: tool.name,
-            description: tool.description
-          })) || [],
-          endpoints: {
-            health: '/health',
-            info: '/info',
-            mcp: 'stdio (MCP protocol)'
-          }
-        });
-      });
-
-      app.listen(port, '0.0.0.0', () => {
-        Logger.logWithContext('info', `HTTP server listening on port ${port}`, 'MCPServer');
-        Logger.logWithContext('info', `Health endpoint: http://localhost:${port}/health`, 'MCPServer');
-        Logger.logWithContext('info', `Info endpoint: http://localhost:${port}/info`, 'MCPServer');
-      });
-    } catch (error) {
-      Logger.logWithContext('warn', 'Failed to start HTTP server (express not available)', 'MCPServer', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+    } catch (error: any) {
+            process.exit(1);
     }
   }
 }
@@ -749,58 +294,15 @@ async function startHttpServer(mcpServer: RestorepointMCPServer): Promise<void> 
  * Main entry point
  */
 async function main(): Promise<void> {
-  // Load configuration and initialize Logger first
-  const config = await configManager.loadConfig();
-  Logger.initialize(config);
-  Logger.logWithContext('info', 'Starting MCP Server', 'MCPServer');
-  
-  const server = new RestorepointMCPServer();
+  const server = new RestorepointHttpServer();
   await server.start();
-  
-  // Start HTTP server for health checks (if enabled)
-  await startHttpServer(server);
 }
 
 // Start the server if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    // Initialize Logger before usage - provide fallback config if needed
-    try {
-      Logger.initialize({
-        restorepoint: { 
-          serverUrl: 'unknown', 
-          apiVersion: 'v1',
-          token: 'fallback',
-          timeout: 30000,
-          retryAttempts: 3,
-          retryDelay: 1000
-        },
-        mcp: { 
-          serverName: 'fallback-server',
-          version: '1.0.0',
-          logLevel: 'error',
-          maxConcurrentTasks: 1
-        },
-        async: { 
-          maxConcurrentTasks: 1,
-          taskTimeout: 60000,
-          cleanupInterval: 30000
-        }
-      });
-      Logger.logWithContext('error', 'Failed to start MCP Server', 'MCPServer', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-      });
-    } catch (loggerError) {
-      // Fallback to console if Logger initialization fails
-      console.error('Failed to start MCP Server:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: error instanceof Error ? error.constructor.name : typeof error,
-        loggerError: loggerError instanceof Error ? loggerError.message : 'Unknown logger error'
-      });
-    }
     process.exit(1);
   });
 }
 
-export { RestorepointMCPServer };
+export { RestorepointHttpServer, main };

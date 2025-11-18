@@ -1,0 +1,21 @@
+{
+  "restorepoint": {
+    "serverUrl": "https://your-restorepoint-server.com",
+    "apiVersion": "v2",
+    "token": "your-api-token-here",
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "mcp": {
+    "serverName": "RP_SL1_MCP",
+    "version": "1.0.0",
+    "logLevel": "info",
+    "maxConcurrentTasks": 10
+  },
+  "async": {
+    "maxConcurrentTasks": 10,
+    "taskTimeout": 3600000,
+    "cleanupInterval": 300000
+  }
+}

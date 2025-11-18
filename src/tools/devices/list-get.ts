@@ -22,8 +22,6 @@ export const handleListDevices = async (args: unknown, apiClient: ApiClient): Pr
     const { 
       limit = 50, 
       offset = 0, 
-      sortBy = 'name', 
-      sortOrder = 'asc', 
       filter 
     } = args as { 
       limit?: number; 
@@ -61,15 +59,13 @@ export const handleListDevices = async (args: unknown, apiClient: ApiClient): Pr
     }
 
     Logger.logWithContext('info', 'Fetching devices from Restorepoint API', 'DeviceTools', {
-      limit, offset, sortBy, sortOrder, hasFilter: !!filter
+      limit, offset, hasFilter: !!filter
     });
 
-    // Build query parameters for API request
+    // Build query parameters for API request (devices endpoint doesn't support sorting)
     const queryParams = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
-      sort: sortBy,
-      order: sortOrder,
     });
 
     // Add filter parameters if provided
@@ -96,10 +92,46 @@ export const handleListDevices = async (args: unknown, apiClient: ApiClient): Pr
       );
     }
 
-    const deviceData = response.data as any;
-    const devices = deviceData.devices || deviceData.data || [];
-    const total = deviceData.metadata?.total || deviceData.total || devices.length;
-    const startIndex = deviceData.offset || offset;
+    // The API client transforms the response, but it's not working correctly for pagination
+    // The actual response contains the device array directly
+    const apiResponse = response.data as any;
+    
+    // Check if we got the raw device array (API client transform failed) or wrapped response
+    if (Array.isArray(apiResponse)) {
+      // We got the raw device array directly - extract devices from it
+      const devices = apiResponse;
+      const total = devices.length; // We don't have the total from metadata, so use array length
+      
+      timer();
+
+      Logger.logWithContext('info', 'Devices retrieved successfully from API', 'DeviceTools', {
+        returned: devices.length,
+        total,
+        limit,
+        offset,
+        hasFilter: !!filter,
+      });
+
+      return {
+        success: true,
+        data: devices,
+        metadata: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+          totalPages: Math.ceil(total / limit),
+          hasFilter: !!filter,
+          filters: filter || {},
+        },
+        message: `Successfully retrieved ${devices.length} of ${total} devices`,
+      };
+    }
+    
+    // Normal wrapped response handling
+    const devices = apiResponse.data || [];
+    const total = apiResponse.metadata?.total || apiResponse.total || 0;
+    const startIndex = apiResponse.metadata?.offset || offset;
     const endIndex = Math.min(startIndex + limit, total);
 
     timer();

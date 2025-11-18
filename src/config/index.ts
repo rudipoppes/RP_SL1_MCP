@@ -75,12 +75,7 @@ export class ConfigManager {
       // Apply defaults and parse with Zod
       this._config = AppConfigSchema.parse(configData);
       
-      // Log warnings if any
-      if (validationResult.warnings.length > 0) {
-        // Note: Logger may not be initialized yet, so we use console.warn for configuration warnings
-        console.warn('Configuration warnings:', validationResult.warnings.join('\n'));
-      }
-
+      
       return this._config;
     } catch (error) {
       throw new Error(`Failed to load configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);

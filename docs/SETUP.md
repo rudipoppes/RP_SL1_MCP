@@ -28,22 +28,56 @@ Create/Edit `config.json`:
 
 ### 2. Start Server
 
-**Development Mode (Recommended):**
+**HTTP Mode (PRIMARY - Recommended for Web Integration):**
+```bash
+cd RP_SL1_MCP
+./start-mcp-server.sh
+```
+
+**Alternative HTTP Mode:**
+```bash
+cd RP_SL1_MCP
+ENABLE_HTTP_SERVER=true npm run dev
+```
+
+**Development Mode (stdio only - for MCP Inspector):**
 ```bash
 cd RP_SL1_MCP
 npm run dev
 ```
 
-**Production Mode:**
+**Production Mode (HTTP):**
 ```bash
 cd RP_SL1_MCP
 npm run build
-npm start
+ENABLE_HTTP_SERVER=true NODE_ENV=production node dist/server.js
 ```
 
 ### 3. Stop Server
 
 **Ctrl+C** in terminal or send SIGTERM signal
+
+## HTTP vs stdio Modes
+
+### **HTTP Mode (PRIMARY)**
+**Use HTTP Mode for:**
+- ✅ **Web applications** and chat interfaces
+- ✅ **REST API integration** with external systems
+- ✅ **Production deployments** with standard web infrastructure
+- ✅ **Microservices architecture**
+- ✅ **When you need HTTP endpoints**: `/tools/execute`, `/health`, `/info`
+
+**Start with:** `ENABLE_HTTP_SERVER=true npm run dev`
+
+### **stdio Mode (DEVELOPMENT ONLY)**
+**Use stdio Mode only for:**
+- 📋 **MCP Inspector testing** and development
+- 📋 **Direct MCP protocol communication**
+- 📋 **Local tool testing** without HTTP overhead
+
+**Start with:** `npm run dev` (no HTTP server)
+
+> **IMPORTANT**: For chat interfaces and web integration, **HTTP Mode is REQUIRED**. stdio mode cannot be accessed from web browsers.
 
 ## Testing the MCP Server
 
@@ -191,8 +225,10 @@ echo '{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "list_device
 2. Check server logs for connection errors
 3. Test Restorepoint API directly:
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" https://your-restorepoint-server.com/api/v2/devices
+curl -k -H "Authorization: Custom YOUR_TOKEN" https://your-restorepoint-server.com/api/v2/devices
 ```
+
+**Important**: Restorepoint API uses `Authorization: Custom <token>` format (NOT Bearer).
 
 ### Performance Issues
 1. Check log level in config.json (set to "warn" for production)

@@ -14,11 +14,12 @@ This project provides a world-class MCP server that enables natural language int
 
 ### **Key Features**
 - 🔧 **11+ Restorepoint Management Tools**: Device management, backup operations, command execution
+- 🌐 **HTTP REST API**: Full web-compatible endpoints (`/tools/execute`, `/health`, `/info`)
 - ⚡ **Native Node.js Deployment**: Runs directly on OS for optimal performance
 - ☁️ **AWS EC2 Ready**: Simple deployment to EC2 (~$12-15/month)
 - 🧪 **Comprehensive Testing**: 41 passing tests with Jest framework
 - 📚 **Enterprise-Grade Architecture**: Professional standards, logging, error handling
-- 🤖 **AI Integration Ready**: Designed for z.ai, OpenAI, or other AI providers
+- 🤖 **Web Integration Ready**: Perfect for chat interfaces and web applications
 
 ---
 
@@ -31,9 +32,14 @@ git clone https://github.com/rudipoppes/RP_SL1_MCP.git
 cd RP_SL1_MCP
 ./deployment/scripts/setup-local.sh
 
-# Start with HTTP endpoints
-ENABLE_HTTP_SERVER=true npm run dev
+# Start HTTP server (REQUIRED for web integration)
+./start-mcp-server.sh
 ```
+
+**HTTP Mode is PRIMARY** - Required for:
+- Web applications and chat interfaces  
+- REST API integration
+- Standard deployment patterns
 
 ### **Production Deployment**
 ```bash
@@ -44,8 +50,25 @@ ENABLE_HTTP_SERVER=true npm run dev
 ### **Test**
 ```bash
 curl http://localhost:3000/health
+curl -X POST "http://localhost:3000/tools/execute" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "list_devices", "arguments": {"limit": 10}}'
 npm test
 ```
+
+### **Configuration**
+Edit `config.json` to configure your Restorepoint server:
+```json
+{
+  "restorepoint": {
+    "serverUrl": "https://your-restorepoint-server.com",
+    "token": "your-access-token",
+    "apiVersion": "v2"
+  }
+}
+```
+
+**Authentication Note**: The Restorepoint API uses `Authorization: Custom <token>` format (not Bearer).
 
 ---
 

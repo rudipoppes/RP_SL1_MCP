@@ -107,7 +107,7 @@ export class ApiClient {
           // Add authentication token if available
           if (!config.skipAuth) {
             const token = await tokenManager.ensureValidToken();
-            (config.headers as any)['Authorization'] = token;
+            (config.headers as any)['Authorization'] = `Custom ${token}`;
           }
 
           Logger.logWithContext('debug', `Making ${config.method?.toUpperCase()} request to ${config.url}`, 'ApiClient', {
@@ -159,7 +159,7 @@ export class ApiClient {
             const token = tokenManager.getToken();
             
             if (token) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
+              originalRequest.headers.Authorization = `Custom ${token}`;
               return this.axiosInstance(originalRequest);
             }
           } catch (refreshError) {
