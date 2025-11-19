@@ -115,44 +115,116 @@ export interface GetDeviceTool extends McpTool {
 
 export interface CreateDeviceTool extends McpTool {
   readonly name: 'create_device';
-  readonly description: 'Create a new device in Restorepoint';
+  readonly description: 'Create a new device in Restorepoint. Use get_device_requirements tool first to see exactly what is required and supported device types.';
   readonly inputSchema: McpInputSchema & {
     readonly required: readonly ['name', 'type', 'credentials'];
     readonly properties: {
       readonly name: McpProperty & { 
         type: 'string'; 
-        description: 'Name of the device';
+        description: 'Name of the device (1-200 characters)';
         minLength: 1;
         maxLength: 200;
       };
       readonly type: McpProperty & { 
         type: 'string'; 
-        description: 'Type of device (e.g., cisco-ios, palo-alto, linux)';
+        description: 'Device type identifier. Use get_device_requirements to see all supported types (e.g., cisco-ios, palo-alto, linux, windows)';
         minLength: 1;
+        enum: readonly ['cisco-ios', 'cisco-nxos', 'palo-alto', 'fortinet', 'linux', 'windows', 'juniper', 'arista'];
       };
       readonly ipAddress?: McpProperty & { 
         type: 'string'; 
-        description: 'IP address of the device';
+        description: 'IP address of the device (use either ipAddress or hostname, not both)';
         pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$';
       };
       readonly hostname?: McpProperty & { 
         type: 'string'; 
-        description: 'Hostname of the device';
+        description: 'Hostname of the device (use either hostname or ipAddress, not both)';
         maxLength: 253;
       };
-      readonly credentials: McpProperty & { type: 'object'; properties: {
-        readonly username: McpProperty & { type: 'string'; description: 'Username for device access' };
-        readonly password: McpProperty & { type: 'string'; description: 'Password for device access' };
-      }; required: readonly ['username', 'password']};
+      readonly credentials: McpProperty & { 
+        type: 'object'; 
+        description: 'Device access credentials with username and password';
+        properties: {
+          readonly username: McpProperty & { type: 'string'; description: 'Username for device access' };
+          readonly password: McpProperty & { type: 'string'; description: 'Password for device access' };
+        }; 
+        required: readonly ['username', 'password'];
+      };
       readonly description?: McpProperty & { 
         type: 'string'; 
-        description: 'Description of the device';
+        description: 'Optional device description (max 500 characters)';
         maxLength: 500;
       };
       readonly enabled?: McpProperty & { 
         type: 'boolean'; 
         default: true;
-        description: 'Whether the device is enabled';
+        description: 'Whether the device is enabled for monitoring and backups';
+      };
+    };
+  };
+}
+
+export interface GetDeviceRequirementsTool extends McpTool {
+  readonly name: 'get_device_requirements';
+  readonly description: 'Get comprehensive device creation requirements including supported device types, required fields, protocols, and examples';
+  readonly inputSchema: McpInputSchema & {
+    readonly properties: {
+      readonly deviceType?: McpProperty & { 
+        type: 'string'; 
+        description: 'Optional: Get detailed requirements for a specific device type. Leave empty to see all supported types.';
+        enum: readonly ['cisco-ios', 'cisco-nxos', 'palo-alto', 'fortinet', 'linux', 'windows', 'juniper', 'arista'];
+      };
+      readonly includeExamples?: McpProperty & { 
+        type: 'boolean'; 
+        default: true;
+        description: 'Include example device configurations';
+      };
+      readonly includeValidation?: McpProperty & { 
+        type: 'boolean'; 
+        default: false;
+        description: 'Include validation of a sample request (requires request parameter)';
+      };
+      readonly request?: McpProperty & { 
+        type: 'object'; 
+        description: 'Optional: Device creation request to validate when includeValidation=true';
+        properties: {
+          readonly name?: McpProperty & { type: 'string' };
+          readonly type?: McpProperty & { type: 'string' };
+          readonly ipAddress?: McpProperty & { type: 'string' };
+          readonly hostname?: McpProperty & { type: 'string' };
+          readonly credentials?: McpProperty & { type: 'object'; properties: {
+            readonly username?: McpProperty & { type: 'string' };
+            readonly password?: McpProperty & { type: 'string' };
+          }};
+          readonly description?: McpProperty & { type: 'string' };
+          readonly enabled?: McpProperty & { type: 'boolean' };
+        };
+      };
+    };
+  };
+}
+
+export interface ValidateDeviceRequestTool extends McpTool {
+  readonly name: 'validate_device_request';
+  readonly description: 'Validate a device creation request before submitting to create_device. Returns detailed validation errors and recommendations.';
+  readonly inputSchema: McpInputSchema & {
+    readonly required: readonly ['request'];
+    readonly properties: {
+      readonly request: McpProperty & { 
+        type: 'object'; 
+        description: 'Device creation request to validate';
+        properties: {
+          readonly name?: McpProperty & { type: 'string'; description: 'Device name' };
+          readonly type?: McpProperty & { type: 'string'; description: 'Device type' };
+          readonly ipAddress?: McpProperty & { type: 'string'; description: 'IP address' };
+          readonly hostname?: McpProperty & { type: 'string'; description: 'Hostname' };
+          readonly credentials?: McpProperty & { type: 'object'; properties: {
+            readonly username?: McpProperty & { type: 'string'; description: 'Username' };
+            readonly password?: McpProperty & { type: 'string'; description: 'Password' };
+          }};
+          readonly description?: McpProperty & { type: 'string'; description: 'Description' };
+          readonly enabled?: McpProperty & { type: 'boolean'; description: 'Enabled status' };
+        };
       };
     };
   };

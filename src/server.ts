@@ -15,6 +15,7 @@ import { Logger } from './utils/logger.js';
 import { handleListDevices, handleGetDevice } from './tools/devices/list-get.js';
 import { handleGetStatus } from './tools/devices/status.js';
 import { handleCreateDevice, handleUpdateDevice, handleDeleteDevice } from './tools/devices/crud.js';
+import { handleGetDeviceRequirements, handleValidateDeviceRequest } from './tools/devices/requirements-handler.js';
 import { handleListBackups, handleGetBackup, handleCreateBackup } from './tools/backups/index.js';
 import { handleListCommands, handleGetCommand, handleExecuteCommand, handleGetTaskStatus } from './tools/commands/index.js';
 import type { McpResult } from './types/mcp-tools.js';
@@ -110,6 +111,8 @@ class RestorepointHttpServer {
         { name: 'create_device', description: 'Add a new device' },
         { name: 'update_device', description: 'Update device configuration' },
         { name: 'delete_device', description: 'Remove a device' },
+        { name: 'get_device_requirements', description: 'Get device creation requirements and supported types' },
+        { name: 'validate_device_request', description: 'Validate device creation request before submission' },
         { name: 'list_backups', description: 'List backup history' },
         { name: 'get_backup', description: 'Get backup details' },
         { name: 'create_backup', description: 'Start backup operation' },
@@ -142,7 +145,7 @@ class RestorepointHttpServer {
         success: true,
         data: {
           message: 'Use POST /tools/execute to execute tools',
-          availableTools: ['list_devices', 'get_device', 'get_status', 'create_device', 'update_device', 'delete_device', 'list_backups', 'get_backup', 'create_backup', 'list_commands', 'get_command', 'execute_command', 'get_task_status']
+          availableTools: ['list_devices', 'get_device', 'get_status', 'create_device', 'update_device', 'delete_device', 'get_device_requirements', 'validate_device_request', 'list_backups', 'get_backup', 'create_backup', 'list_commands', 'get_command', 'execute_command', 'get_task_status']
         },
         timestamp: new Date().toISOString()
       });
@@ -198,6 +201,12 @@ class RestorepointHttpServer {
             break;
           case 'delete_device':
             result = await handleDeleteDevice(args, this.apiClient);
+            break;
+          case 'get_device_requirements':
+            result = await handleGetDeviceRequirements(args);
+            break;
+          case 'validate_device_request':
+            result = await handleValidateDeviceRequest(args);
             break;
           case 'list_backups':
             result = await handleListBackups(args, this.apiClient);

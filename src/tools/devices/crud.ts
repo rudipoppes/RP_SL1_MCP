@@ -10,6 +10,7 @@ import { ApiClient } from '../../auth/api-client.js';
 import { RESTOREPOINT_ENDPOINTS } from '../../constants/endpoints.js';
 import { ERROR_CODES, RestorepointError } from '../../constants/error-codes.js';
 import type { Device, DeviceCreateRequest, DeviceUpdateRequest, DeviceResponse, PluginField, DeviceMonitor, AssetField, BackupSchedule, FailurePolicy } from '../../types/restorepoint-api.js';
+import { validateDeviceRequest, getDeviceTypeInfo, DEVICE_TYPES } from './requirements.js';
 
 /**
  * Handle create_device tool with validation and real API integration
@@ -36,80 +37,61 @@ export const handleCreateDevice = async (args: unknown, apiClient: ApiClient): P
       enabled?: boolean;
     };
 
-    // Input validation
-    if (!name || !type || !credentials) {
+    Logger.logWithContext('info', 'Creating new device with enhanced validation', 'DeviceTools', {
+      name,
+      type,
+      ipAddress,
+      hostname,
+      enabled,
+      hasCredentials: !!credentials,
+    });
+
+    // Use comprehensive validation
+    const validation = validateDeviceRequest({
+      name,
+      type,
+      ipAddress,
+      hostname,
+      credentials,
+      description,
+      enabled
+    });
+
+    if (!validation.isValid) {
+      Logger.logWithContext('warn', 'Device creation request failed validation', 'DeviceTools', {
+        name,
+        type,
+        errorCount: validation.errors.length,
+        errors: validation.errors
+      });
+
       return {
         success: false,
         error: {
-          code: ERROR_CODES.VALIDATION_MISSING_FIELD,
-          message: 'Device name, type, and credentials are required',
+          code: ERROR_CODES.VALIDATION_INVALID_INPUT,
+          message: `Device creation request has validation errors: ${validation.errors.join('; ')}`,
+          details: {
+            validationErrors: validation.errors,
+            suggestion: 'Use the get_device_requirements tool to see exactly what is required and supported device types.'
+          },
           timestamp: new Date().toISOString(),
         },
       };
     }
 
-    if (name.trim().length === 0 || name.length > 200) {
+    // Validate device type is supported
+    const deviceTypeInfo = getDeviceTypeInfo(type);
+    if (!deviceTypeInfo) {
+      const supportedTypes = Object.keys(DEVICE_TYPES).join(', ');
       return {
         success: false,
         error: {
-          code: ERROR_CODES.VALIDATION_INVALID_FORMAT,
-          message: 'Device name must be 1-200 characters',
-          timestamp: new Date().toISOString(),
-        },
-      };
-    }
-
-    if (type.trim().length === 0) {
-      return {
-        success: false,
-        error: {
-          code: ERROR_CODES.VALIDATION_INVALID_FORMAT,
-          message: 'Device type is required',
-          timestamp: new Date().toISOString(),
-        },
-      };
-    }
-
-    if (!credentials.username || !credentials.password) {
-      return {
-        success: false,
-        error: {
-          code: ERROR_CODES.VALIDATION_MISSING_FIELD,
-          message: 'Both username and password are required in credentials',
-          timestamp: new Date().toISOString(),
-        },
-      };
-    }
-
-    // Validate IP address format if provided
-    if (ipAddress && !isValidIpAddress(ipAddress)) {
-      return {
-        success: false,
-        error: {
-          code: ERROR_CODES.VALIDATION_INVALID_FORMAT,
-          message: 'Invalid IP address format',
-          timestamp: new Date().toISOString(),
-        },
-      };
-    }
-
-    if (hostname && hostname.length > 253) {
-      return {
-        success: false,
-        error: {
-          code: ERROR_CODES.VALIDATION_OUT_OF_RANGE,
-          message: 'Hostname must be 253 characters or less',
-          timestamp: new Date().toISOString(),
-        },
-      };
-    }
-
-    if (description && description.length > 500) {
-      return {
-        success: false,
-        error: {
-          code: ERROR_CODES.VALIDATION_OUT_OF_RANGE,
-          message: 'Description must be 500 characters or less',
+          code: ERROR_CODES.DEVICE_INVALID_TYPE,
+          message: `Unsupported device type: '${type}'. Supported types: ${supportedTypes}`,
+          details: {
+            supportedDeviceTypes: Object.keys(DEVICE_TYPES),
+            suggestion: 'Use get_device_requirements tool to see all supported device types with examples.'
+          },
           timestamp: new Date().toISOString(),
         },
       };
@@ -122,10 +104,12 @@ export const handleCreateDevice = async (args: unknown, apiClient: ApiClient): P
       hostname,
       enabled,
       hasCredentials: !!credentials,
+      pluginKey: deviceTypeInfo.pluginKey,
+      displayName: deviceTypeInfo.displayName
     });
 
-    // Map user-friendly device type to PluginKey
-    const pluginKey = mapDeviceTypeToPluginKey(type.trim().toLowerCase());
+    // Use the validated device type info
+    const pluginKey = deviceTypeInfo.pluginKey;
     
     // Build PluginFields array based on plugin type
     const pluginFields: PluginField[] = buildPluginFields(pluginKey, credentials);
@@ -198,11 +182,16 @@ export const handleCreateDevice = async (args: unknown, apiClient: ApiClient): P
 
       if (response.message?.toLowerCase().includes('invalid type') ||
           response.errors?.invalidType) {
+        const supportedTypes = Object.keys(DEVICE_TYPES).join(', ');
         return {
           success: false,
           error: {
             code: ERROR_CODES.DEVICE_INVALID_TYPE,
-            message: `Invalid device type: ${type}. Supported types include: cisco-ios, cisco-nxos, linux, windows, palo-alto, etc.`,
+            message: `Invalid device type: ${type}. Supported types: ${supportedTypes}`,
+            details: {
+              supportedDeviceTypes: Object.keys(DEVICE_TYPES),
+              suggestion: 'Use get_device_requirements tool to see all supported device types with detailed information and examples.'
+            },
             timestamp: new Date().toISOString(),
           },
         };
@@ -617,50 +606,11 @@ function isValidIpAddress(ip: string): boolean {
 
 /**
  * Map user-friendly device types to PluginKey values
+ * @deprecated Use getDeviceTypeInfo from requirements.ts instead
  */
 function mapDeviceTypeToPluginKey(deviceType: string): string {
-  const typeMap: Record<string, string> = {
-    'cisco-ios': 'cisco_ios',
-    'cisco': 'cisco_ios',
-    'ios': 'cisco_ios',
-    'cisco-nxos': 'cisco_nxos',
-    'nxos': 'cisco_nxos',
-    'nexus': 'cisco_nxos',
-    'cisco-ios-xr': 'cisco_iosxr',
-    'ios-xr': 'cisco_iosxr',
-    'linux': 'linux',
-    'ubuntu': 'linux',
-    'debian': 'linux',
-    'centos': 'linux',
-    'rhel': 'linux',
-    'windows': 'windows',
-    'win': 'windows',
-    'windows-server': 'windows',
-    'palo-alto': 'palo_alto',
-    'paloalto': 'palo_alto',
-    'panorama': 'palo_alto',
-    'fortinet': 'fortinet_fortigate',
-    'fortigate': 'fortinet_fortigate',
-    'juniper': 'juniper',
-    'juniper-screenos': 'juniper_screenos',
-    'juniper-junos': 'juniper_junos',
-    'arista': 'arista_eos',
-    'eos': 'arista_eos',
-    'hp': 'hp',
-    'hp-procurve': 'hp_procurve',
-    'dell': 'dell',
-    'brocade': 'brocade',
-    'checkpoint': 'checkpoint',
-    'f5': 'f5_bigip',
-    'bigip': 'f5_bigip',
-    'netscaler': 'citrix_netscaler',
-    'cisco-asa': 'cisco_asa',
-    'asa': 'cisco_asa',
-    'cisco-firepower': 'cisco_firepower',
-    'firepower': 'cisco_firepower'
-  };
-
-  return typeMap[deviceType] || deviceType.replace(/[-\s]+/g, '_').toLowerCase();
+  const typeInfo = getDeviceTypeInfo(deviceType);
+  return typeInfo ? typeInfo.pluginKey : deviceType.replace(/[-\s]+/g, '_').toLowerCase();
 }
 
 /**
