@@ -80,6 +80,54 @@ export interface Backup {
 }
 
 /**
+ * Plugin field for device configuration
+ */
+export interface PluginField {
+  readonly Name: string;
+  readonly Value: string;
+}
+
+/**
+ * Device monitoring configuration
+ */
+export interface DeviceMonitor {
+  readonly Enabled?: boolean;
+  readonly AlertFail?: number;
+  readonly IsPing?: boolean;
+  readonly AlertEmail?: boolean;
+  readonly AlertEmailUp?: boolean;
+}
+
+/**
+ * Asset field for device information
+ */
+export interface AssetField {
+  readonly ID: number;
+  readonly Value: string;
+}
+
+/**
+ * Backup schedule configuration
+ */
+export interface BackupSchedule {
+  readonly Schedule: CronExpression;
+  readonly RetainVersions?: number;
+  readonly RetainDays?: number;
+  readonly DeleteDays?: number;
+  readonly ConfigTypes?: readonly string[];
+}
+
+/**
+ * Failure policy configuration
+ */
+export interface FailurePolicy {
+  readonly Retries?: number;
+  readonly Action?: 'Revert' | 'Manual' | 'Disable';
+  readonly Alerts?: number;
+  readonly RetryInterval?: number;
+}
+
+/**
  * Task information for async operations
  */
 export interface TaskInfo {
@@ -219,21 +267,25 @@ export interface DeviceQueryParams extends CommonQueryParams {
  * Device creation request payload
  */
 export interface DeviceCreateRequest {
-  readonly name: string;
-  readonly type: string;
-  readonly ipAddress?: string;
-  readonly hostname?: string;
-  readonly credentials: {
-    readonly username: string;
-    readonly password: string;
-  };
-  readonly description?: string;
-  readonly enabled?: boolean;
-  readonly tags?: readonly string[];
-  readonly domainId?: string;
-  readonly location?: string;
-  readonly vendor?: string;
-  readonly model?: string;
+  readonly Name: string;
+  readonly PluginKey: string;
+  readonly PluginFields: readonly PluginField[];
+  readonly Address: string;
+  readonly Protocol: string;
+  readonly DomainID?: number;
+  readonly CredentialID?: number;
+  readonly Disabled?: boolean;
+  readonly Description?: string;
+  readonly NotificationEmails?: readonly string[];
+  readonly Monitor?: DeviceMonitor;
+  readonly AssetFields?: readonly AssetField[];
+  readonly BackupSchedules?: readonly BackupSchedule[];
+  readonly ManualConfigTypes?: readonly string[];
+  readonly BackupPrefix?: string;
+  readonly FailurePolicy?: FailurePolicy;
+  readonly PolicyIDs?: readonly number[];
+  readonly UseAutoApply?: boolean;
+  readonly LabelIDs?: readonly number[];
 }
 
 /**

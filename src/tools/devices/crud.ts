@@ -9,7 +9,7 @@ import { Logger } from '../../utils/logger.js';
 import { ApiClient } from '../../auth/api-client.js';
 import { RESTOREPOINT_ENDPOINTS } from '../../constants/endpoints.js';
 import { ERROR_CODES, RestorepointError } from '../../constants/error-codes.js';
-import type { Device, DeviceCreateRequest, DeviceUpdateRequest, DeviceResponse } from '../../types/restorepoint-api.js';
+import type { Device, DeviceCreateRequest, DeviceUpdateRequest, DeviceResponse, PluginField, DeviceMonitor, AssetField, BackupSchedule, FailurePolicy } from '../../types/restorepoint-api.js';
 
 /**
  * Handle create_device tool with validation and real API integration
@@ -124,19 +124,57 @@ export const handleCreateDevice = async (args: unknown, apiClient: ApiClient): P
       hasCredentials: !!credentials,
     });
 
-    // Prepare device creation request
-    const deviceRequest: DeviceCreateRequest = {
-      name: name.trim(),
-      type: type.trim().toLowerCase(),
-      ipAddress: ipAddress?.trim(),
-      hostname: hostname?.trim(),
-      credentials: {
-        username: credentials.username.trim(),
-        password: credentials.password, // Password will be sent securely
-      },
-      description: description?.trim(),
-      enabled,
+    // Map user-friendly device type to PluginKey
+    const pluginKey = mapDeviceTypeToPluginKey(type.trim().toLowerCase());
+    
+    // Build PluginFields array based on plugin type
+    const pluginFields: PluginField[] = buildPluginFields(pluginKey, credentials);
+    
+    // Determine address and protocol
+    const address = ipAddress?.trim() || hostname?.trim() || name.trim();
+    const protocol = determineProtocol(pluginKey, ipAddress);
+    
+    // Build mandatory Monitor object
+    const monitor: DeviceMonitor = {
+      Enabled: true,
+      AlertFail: 3,
+      IsPing: true,
+      AlertEmail: true,
+      AlertEmailUp: false
     };
+
+    // Prepare device creation request according to swagger specification
+    const deviceRequest: DeviceCreateRequest = {
+      Name: name.trim(),
+      PluginKey: pluginKey,
+      PluginFields: pluginFields,
+      Address: address,
+      Protocol: protocol,
+      DomainID: undefined, // Optional - using default domain
+      CredentialID: undefined, // Optional - using PluginFields instead
+      Disabled: !enabled,
+      Description: description?.trim(),
+      NotificationEmails: undefined, // Optional
+      Monitor: monitor,
+      AssetFields: undefined, // Optional
+      BackupSchedules: undefined, // Optional
+      ManualConfigTypes: undefined, // Optional
+      BackupPrefix: undefined, // Optional
+      FailurePolicy: undefined, // Optional
+      PolicyIDs: undefined, // Optional
+      UseAutoApply: false, // Default
+      LabelIDs: undefined // Optional
+    };
+
+    // Debug log the payload being sent
+    Logger.logWithContext('debug', 'Device creation payload', 'DeviceTools', {
+      pluginKey,
+      address,
+      protocol,
+      monitor,
+      pluginFieldsCount: pluginFields.length,
+      deviceRequest: JSON.stringify(deviceRequest, null, 2)
+    });
 
     // Make API request to create device
     const response = await apiClient.post<DeviceResponse>(
@@ -575,4 +613,168 @@ export const handleDeleteDevice = async (args: unknown, apiClient: ApiClient): P
 function isValidIpAddress(ip: string): boolean {
   const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   return ipRegex.test(ip);
+}
+
+/**
+ * Map user-friendly device types to PluginKey values
+ */
+function mapDeviceTypeToPluginKey(deviceType: string): string {
+  const typeMap: Record<string, string> = {
+    'cisco-ios': 'cisco_ios',
+    'cisco': 'cisco_ios',
+    'ios': 'cisco_ios',
+    'cisco-nxos': 'cisco_nxos',
+    'nxos': 'cisco_nxos',
+    'nexus': 'cisco_nxos',
+    'cisco-ios-xr': 'cisco_iosxr',
+    'ios-xr': 'cisco_iosxr',
+    'linux': 'linux',
+    'ubuntu': 'linux',
+    'debian': 'linux',
+    'centos': 'linux',
+    'rhel': 'linux',
+    'windows': 'windows',
+    'win': 'windows',
+    'windows-server': 'windows',
+    'palo-alto': 'palo_alto',
+    'paloalto': 'palo_alto',
+    'panorama': 'palo_alto',
+    'fortinet': 'fortinet_fortigate',
+    'fortigate': 'fortinet_fortigate',
+    'juniper': 'juniper',
+    'juniper-screenos': 'juniper_screenos',
+    'juniper-junos': 'juniper_junos',
+    'arista': 'arista_eos',
+    'eos': 'arista_eos',
+    'hp': 'hp',
+    'hp-procurve': 'hp_procurve',
+    'dell': 'dell',
+    'brocade': 'brocade',
+    'checkpoint': 'checkpoint',
+    'f5': 'f5_bigip',
+    'bigip': 'f5_bigip',
+    'netscaler': 'citrix_netscaler',
+    'cisco-asa': 'cisco_asa',
+    'asa': 'cisco_asa',
+    'cisco-firepower': 'cisco_firepower',
+    'firepower': 'cisco_firepower'
+  };
+
+  return typeMap[deviceType] || deviceType.replace(/[-\s]+/g, '_').toLowerCase();
+}
+
+/**
+ * Build PluginFields array based on plugin type and credentials
+ */
+function buildPluginFields(pluginKey: string, credentials: { username: string; password: string }): PluginField[] {
+  const fields: PluginField[] = [];
+  
+  // Most devices require username and password
+  fields.push({
+    Name: 'username',
+    Value: credentials.username.trim()
+  });
+  
+  fields.push({
+    Name: 'password',
+    Value: credentials.password
+  });
+  
+  // Add plugin-specific fields
+  switch (pluginKey) {
+    case 'cisco_ios':
+    case 'cisco_nxos':
+    case 'cisco_iosxr':
+    case 'juniper_junos':
+    case 'arista_eos':
+      fields.push({
+        Name: 'enable_password',
+        Value: credentials.password // Using same password for simplicity
+      });
+      break;
+      
+    case 'palo_alto':
+      fields.push({
+        Name: 'backup_port',
+        Value: '443'
+      });
+      break;
+      
+    case 'fortinet_fortigate':
+      fields.push({
+        Name: 'backup_port',
+        Value: '443'
+      });
+      break;
+      
+    case 'f5_bigip':
+      fields.push({
+        Name: 'backup_port',
+        Value: '443'
+      });
+      break;
+      
+    case 'windows':
+      fields.push({
+        Name: 'winrm_port',
+        Value: '5985'
+      });
+      break;
+  }
+  
+  return fields;
+}
+
+/**
+ * Determine protocol based on plugin type and address
+ */
+function determineProtocol(pluginKey: string, ipAddress?: string): string {
+  // For IP-based devices, determine protocol by plugin type
+  if (ipAddress && isValidIpAddress(ipAddress)) {
+    switch (pluginKey) {
+      case 'cisco_ios':
+      case 'cisco_nxos':
+      case 'cisco_iosxr':
+      case 'juniper_junos':
+      case 'arista_eos':
+      case 'hp_procurve':
+      case 'dell':
+      case 'brocade':
+        return 'SSH';
+        
+      case 'windows':
+        return 'WinRM';
+        
+      case 'palo_alto':
+      case 'fortinet_fortigate':
+      case 'f5_bigip':
+      case 'checkpoint':
+      case 'cisco_asa':
+      case 'cisco_firepower':
+        return 'HTTPS';
+        
+      case 'linux':
+        return 'SSH';
+        
+      default:
+        return 'SSH';
+    }
+  }
+  
+  // For hostname-based devices, assume HTTPS for modern devices
+  switch (pluginKey) {
+    case 'palo_alto':
+    case 'fortinet_fortigate':
+    case 'f5_bigip':
+    case 'checkpoint':
+    case 'cisco_asa':
+    case 'cisco_firepower':
+      return 'HTTPS';
+      
+    case 'windows':
+      return 'WinRM';
+      
+    default:
+      return 'SSH';
+  }
 }
